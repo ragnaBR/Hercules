@@ -12,6 +12,7 @@
 #include "../common/socket.h"
 #include "../common/strlib.h"
 #include "../common/utils.h"
+#include "../common/sysinfo.h"
 #include "../common/HPM.h"
 
 #include "map.h"
@@ -6745,11 +6746,10 @@ static const struct _battle_data {
 void Hercules_report(char* date, char *time_c) {
 	int i, bd_size = ARRAYLENGTH(battle_data);
 	unsigned int config = 0;
-	const char *svn = get_svn_revision();
-	const char *git = get_git_hash();
 	char timestring[25];
 	time_t curtime;
 	char* buf;
+	char platform[256], osversion[256], cpu[256], arch[256], vcstype[32], vcsrevision_src[64], vcsrevision_scripts[64];
 
 	enum config_table {
 		C_CIRCULAR_AREA         = 0x0001,
@@ -6772,6 +6772,14 @@ void Hercules_report(char* date, char *time_c) {
 		C_GCOLLECT				= 0x20000,
 		C_SEND_SHORTLIST		= 0x40000,
 	};
+
+	sysinfo->platform(platform, 256); // TODO[Haru] Add to the stat server
+	sysinfo->osversion(osversion, 256); // TODO[Haru] Add to the stat server
+	sysinfo->cpu(cpu, 256); // TODO[Haru] Add to the stat server
+	sysinfo->arch(arch, 256); // TODO[Haru] Add to the stat server
+	sysinfo->vcstype(vcstype, 32); // TODO[Haru] Add to the stat server
+	sysinfo->vcsrevision_src(vcsrevision_src, 64);
+	sysinfo->vcsrevision_scripts(vcsrevision_scripts, 64); // TODO[Haru] Add to the stat server
 
 	/* we get the current time */
 	time(&curtime);
@@ -6864,7 +6872,7 @@ void Hercules_report(char* date, char *time_c) {
 	safestrncpy((char*)WBUFP(buf,6 + 12), time_c, 9);
 	safestrncpy((char*)WBUFP(buf,6 + 12 + 9), timestring, 24);
 
-	safestrncpy((char*)WBUFP(buf,6 + 12 + 9 + 24), git[0] != HERC_UNKNOWN_VER ? git : svn[0] != HERC_UNKNOWN_VER ? svn : "Unknown", 41);
+	safestrncpy((char*)WBUFP(buf,6 + 12 + 9 + 24), vcsrevision_src, 41);
 	WBUFL(buf,6 + 12 + 9 + 24 + 41) = map->getusers();
 
 	WBUFL(buf,6 + 12 + 9 + 24 + 41 + 4) = config;

@@ -14,6 +14,7 @@
 #include "../common/strlib.h"
 #include "../common/utils.h"
 #include "../common/conf.h"
+#include "../common/sysinfo.h"
 
 #include "atcommand.h"
 #include "battle.h"
@@ -7201,18 +7202,17 @@ ACMD(whereis)
 }
 
 ACMD(version) {
-	const char *git = get_git_hash();
-	const char *svn = get_svn_revision();
-	
-	if ( git[0] != HERC_UNKNOWN_VER ) {
-		sprintf(atcmd_output,msg_txt(1295),git); // Git Hash '%s'
-		clif->message(fd,atcmd_output);
-	} else if ( svn[0] != HERC_UNKNOWN_VER ) {
-		sprintf(atcmd_output,msg_txt(1294),git); // SVN r%s
-		clif->message(fd,atcmd_output);
-	} else
-		clif->message(fd,msg_txt(1296)); // Cannot determine version
-	
+	char platform[256], vcstype[32], vcsrevision_src[64], vcsrevision_scripts[64];
+	sysinfo->platform(platform, 256);
+	sysinfo->vcstype(vcstype, 32);
+	sysinfo->vcsrevision_src(vcsrevision_src, 64);
+	sysinfo->vcsrevision_scripts(vcsrevision_scripts, 64);
+
+	sprintf(atcmd_output, msg_txt(1296), sysinfo->is64bit() ? 64 : 32, platform); // Hercules %d-bit for %s
+	clif->message(fd, atcmd_output);
+	sprintf(atcmd_output, msg_txt(1295), vcstype, vcsrevision_src, vcsrevision_scripts); // %s revision '%s' (src) / '%s' (scripts)
+	clif->message(fd, atcmd_output);
+
 	return true;
 }
 
