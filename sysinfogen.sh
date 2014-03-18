@@ -54,7 +54,7 @@ case $HERC_PLATFORM in
 			DESCRIPTION="$( echo "$LSBINFO" | grep '^Description:' | cut -d: -f2- | sed 's/Enterprise Linux Enterprise Linux/Oracle Linux/' )"
 		fi
 
-		if [ -z "$DIST" -o "$DIST" == "Gentoo" ]; then
+		if [ -z "$DIST" ] || [ "$DIST" = "Gentoo" ]; then
 			if [ -f /etc/gentoo-release ]; then
 				# "Gentoo Base System release 2.2"
 				DIST='Gentoo'
