@@ -205,9 +205,11 @@ int main (int argc, char **argv) {
 	
 	iMalloc->init();// needed for Show* in display_title() [FlavioJS]
 
+	sysinfo->init();
+
 	if (!(msg_silent&0x1))
 		console->display_title();
-	
+
 #ifdef MINICORE // minimalist Core
 	usercheck();
 	do_init(argc,argv);
@@ -262,6 +264,7 @@ int main (int argc, char **argv) {
 	rathread_final();
 	ers_final();
 #endif
+	sysinfo->final();
 
 	iMalloc->final();
 

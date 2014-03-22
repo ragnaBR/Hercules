@@ -575,9 +575,6 @@ static void memmgr_log (char *buf)
 	if( !log_fp ) {
 		time_t raw;
 		struct tm* t;
-		char vcstype[32], vcsrevision[64];
-		sysinfo->vcstype(vcstype, 32);
-		sysinfo->vcsrevision_src(vcsrevision, 64);
 
 		log_fp = fopen(memmer_logfile,"at");
 		if (!log_fp) log_fp = stdout;
@@ -585,7 +582,7 @@ static void memmgr_log (char *buf)
 		time(&raw);
 		t = localtime(&raw);
 		fprintf(log_fp, "\nMemory manager: Memory leaks found at %d/%02d/%02d %02dh%02dm%02ds (%s rev '%s').\n",
-			(t->tm_year+1900), (t->tm_mon+1), t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, vcstype, vcsrevision);
+			(t->tm_year+1900), (t->tm_mon+1), t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, sysinfo->vcstype(), sysinfo->vcsrevision_src());
 	}
 	fprintf(log_fp, "%s", buf);
 	return;

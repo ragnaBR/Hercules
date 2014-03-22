@@ -2,32 +2,53 @@
 // See the LICENSE file
 // Base Author: Haru @ http://hercules.ws
 
-#ifndef	_COMMON_SYSINFO_H_
+#ifndef _COMMON_SYSINFO_H_
 #define _COMMON_SYSINFO_H_
 
 /**
  * Provides various bits of information about the system Hercules is running on
- * (note: on unix systems, to avoid runtime detection, most of the data is]
+ * (note: on unix systems, to avoid runtime detection, most of the data is
  * cached at compile time)
  */
 
 #include "../common/cbasetypes.h"
 
+#ifdef _COMMON_SYSINFO_P_
+struct sysinfo_private {
+	char *platform;
+	char *osversion;
+	char *cpu;
+	char *arch;
+	char *compiler;
+	char *cflags;
+	char *vcstype_name;
+	int vcstype;
+	char *vcsrevision_src;
+	char *vcsrevision_scripts;
+};
+#else
+struct sysinfo_private;
+#endif
+
 /**
  * sysinfo.c interface
  **/
 struct sysinfo_interface {
-	void (*platform) (char *out, size_t len);
-	void (*osversion) (char *out, size_t len);
-	void (*cpu) (char *out, size_t len);
-	void (*arch) (char *out, size_t len);
+	struct sysinfo_private *p;
+
+	const char *(*platform) (void);
+	const char *(*osversion) (void);
+	const char *(*cpu) (void);
+	const char *(*arch) (void);
 	bool (*is64bit) (void);
-	void (*compiler) (char *out, size_t len);
-	void (*cflags) (char *out, size_t len);
-	void (*vcstype) (char *out, size_t len);
-	void (*vcsrevision_src) (char *out, size_t len);
-	void (*vcsrevision_scripts) (char *out, size_t len);
+	const char *(*compiler) (void);
+	const char *(*cflags) (void);
+	const char *(*vcstype) (void);
+	const char *(*vcsrevision_src) (void);
+	const char *(*vcsrevision_scripts) (void);
 	void (*vcsrevision_reload) (void);
+	void (*init) (void);
+	void (*final) (void);
 };
 
 struct sysinfo_interface *sysinfo;

@@ -1148,12 +1148,8 @@ bool pc_authok(struct map_session_data *sd, int login_id2, time_t expiration_tim
 	if( !changing_mapservers ) {
 
 		if (battle_config.display_version == 1) {
-			char vcstype[32], vcsrevision_src[64], vcsrevision_scripts[64];
 			char buf[256];
-			sysinfo->vcstype(vcstype, 32);
-			sysinfo->vcsrevision_src(vcsrevision_src, 64);
-			sysinfo->vcsrevision_scripts(vcsrevision_scripts, 64);
-			sprintf(buf, msg_txt(1295), vcstype, vcsrevision_src, vcsrevision_scripts); // %s revision '%s' (src) / '%s' (scripts)
+			sprintf(buf, msg_txt(1295), sysinfo->vcstype(), sysinfo->vcsrevision_src(), sysinfo->vcsrevision_scripts()); // %s revision '%s' (src) / '%s' (scripts)
 			clif->message(sd->fd, buf);
 		}
 		

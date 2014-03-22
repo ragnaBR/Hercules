@@ -7202,15 +7202,9 @@ ACMD(whereis)
 }
 
 ACMD(version) {
-	char platform[256], vcstype[32], vcsrevision_src[64], vcsrevision_scripts[64];
-	sysinfo->platform(platform, 256);
-	sysinfo->vcstype(vcstype, 32);
-	sysinfo->vcsrevision_src(vcsrevision_src, 64);
-	sysinfo->vcsrevision_scripts(vcsrevision_scripts, 64);
-
-	sprintf(atcmd_output, msg_txt(1296), sysinfo->is64bit() ? 64 : 32, platform); // Hercules %d-bit for %s
+	sprintf(atcmd_output, msg_txt(1296), sysinfo->is64bit() ? 64 : 32, sysinfo->platform()); // Hercules %d-bit for %s
 	clif->message(fd, atcmd_output);
-	sprintf(atcmd_output, msg_txt(1295), vcstype, vcsrevision_src, vcsrevision_scripts); // %s revision '%s' (src) / '%s' (scripts)
+	sprintf(atcmd_output, msg_txt(1295), sysinfo->vcstype(), sysinfo->vcsrevision_src(), sysinfo->vcsrevision_scripts()); // %s revision '%s' (src) / '%s' (scripts)
 	clif->message(fd, atcmd_output);
 
 	return true;

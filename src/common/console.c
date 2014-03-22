@@ -42,17 +42,7 @@ struct console_interface console_s;
  *	CORE : Display title
  *--------------------------------------*/
 void display_title(void) {
-	char platform[128], osversion[128], cpu[128], arch[32], vcstype[32], vcsrevision_src[64], vcsrevision_scripts[64];
-	char compiler[128], cflags[1024];
-	sysinfo->platform(platform, 128);
-	sysinfo->osversion(osversion, 128);
-	sysinfo->cpu(cpu, 128);
-	sysinfo->arch(arch, 32);
-	sysinfo->vcstype(vcstype, 32);
-	sysinfo->vcsrevision_src(vcsrevision_src, 64);
-	sysinfo->vcsrevision_scripts(vcsrevision_scripts, 64);
-	sysinfo->compiler(compiler, 128);
-	sysinfo->cflags(cflags, 1024);
+	const char *vcstype = sysinfo->vcstype();
 
 	ShowMessage("\n");
 	ShowMessage(""CL_BG_RED""CL_BT_WHITE"                                                                      "CL_CLL""CL_NORMAL"\n");
@@ -67,13 +57,13 @@ void display_title(void) {
 	ShowMessage(""CL_BG_RED""CL_BT_WHITE"                    http://hercules.ws/board/                         "CL_CLL""CL_NORMAL"\n");
 	ShowMessage(""CL_BG_RED""CL_BT_WHITE"                                                                      "CL_CLL""CL_NORMAL"\n");
 
-	ShowInfo("Hercules %d-bit for %s\n", sysinfo->is64bit() ? 64 : 32, platform);
-	ShowInfo("%s revision (src): '"CL_WHITE"%s"CL_RESET"'\n", vcstype, vcsrevision_src);
-	ShowInfo("%s revision (scripts): '"CL_WHITE"%s"CL_RESET"'\n", vcstype, vcsrevision_scripts);
-	ShowInfo("OS version: '"CL_WHITE"%s"CL_RESET" [%s]'\n", osversion, arch);
-	ShowInfo("CPU: '"CL_WHITE"%s"CL_RESET"'\n", cpu);
-	ShowInfo("Compiled with %s\n", compiler);
-	ShowInfo("Compile Flags: %s\n", cflags);
+	ShowInfo("Hercules %d-bit for %s\n", sysinfo->is64bit() ? 64 : 32, sysinfo->platform());
+	ShowInfo("%s revision (src): '"CL_WHITE"%s"CL_RESET"'\n", vcstype, sysinfo->vcsrevision_src());
+	ShowInfo("%s revision (scripts): '"CL_WHITE"%s"CL_RESET"'\n", vcstype, sysinfo->vcsrevision_scripts());
+	ShowInfo("OS version: '"CL_WHITE"%s"CL_RESET" [%s]'\n", sysinfo->osversion(), sysinfo->arch());
+	ShowInfo("CPU: '"CL_WHITE"%s"CL_RESET"'\n", sysinfo->cpu());
+	ShowInfo("Compiled with %s\n", sysinfo->compiler());
+	ShowInfo("Compile Flags: %s\n", sysinfo->cflags());
 }
 #ifdef CONSOLE_INPUT
 #if defined(WIN32)

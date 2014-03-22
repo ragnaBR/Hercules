@@ -4,7 +4,9 @@
 
 /// See sysinfo.h for a description of this file
 
+#define _COMMON_SYSINFO_P_
 #include "sysinfo.h"
+#undef _COMMON_SYSINFO_P_
 
 #include "../common/cbasetypes.h"
 #include "../common/core.h"
@@ -20,8 +22,7 @@
 
 /// sysinfo.c interface source
 struct sysinfo_interface sysinfo_s;
-
-#define BUFSIZE 256
+struct sysinfo_private sysinfo_p;
 
 #define VCSTYPE_UNKNOWN 0
 #define VCSTYPE_GIT 1
@@ -29,20 +30,6 @@ struct sysinfo_interface sysinfo_s;
 #define VCSTYPE_NONE -1
 
 #ifdef WIN32
-#define SYSINFO_PLATFORM "Windows"
-#define SYSINFO_OSVERSION sysinfo_osversion_str
-#define SYSINFO_CPU sysinfo_cpu_str
-#define SYSINFO_ARCH sysinfo_arch_str
-#define SYSINFO_CFLAGS "N/A"
-#define SYSINFO_VCSTYPE sysinfo_vcstype_val
-#define SYSINFO_VCSREV sysinfo_vcsrevision_src_str
-
-static char sysinfo_osversion_str[BUFSIZE] = "";
-static char sysinfo_cpu_str[BUFSIZE] = "";
-static char sysinfo_arch_str[BUFSIZE] = "";
-static int sysinfo_vcstype_val = VCSTYPE_UNKNOWN;
-static char sysinfo_vcsrevision_src_str[BUFSIZE] = "";
-
 /**
  * Values to be used with GetProductInfo.
  *
@@ -160,9 +147,6 @@ enum windows_ver_suite {
 #include "sysinfo.inc"
 #endif // WIN32
 
-static char sysinfo_vcsrevision_script_str[BUFSIZE] = "";
-#define SYSINFO_VCSREV_RUNTIME sysinfo_vcsrevision_script_str
-
 // Compiler detection <http://sourceforge.net/p/predef/wiki/Compilers/>
 #if defined(__BORLANDC__)
 #define SYSINFO_COMPILER "Borland C++"
@@ -208,25 +192,21 @@ static char sysinfo_vcsrevision_script_str[BUFSIZE] = "";
 /**
  * Retrieves the current SVN revision.
  *
- * @param out[out] a char buffer to write the output value to.
- * @param len[in]  maximum buffer length.
- * @retval true if a revision was correctly detected.
+ * @param out[out] a string pointer to return the value (to be aFree()'d.)
+ * @retval true  if a revision was correctly detected.
+ * @retval false if no revision was detected. out is set to NULL in this case.
  */
-bool sysinfo_svn_get_revision(char *out, int len) {
+bool sysinfo_svn_get_revision(char **out) {
 	// Only include SVN support if detected it, or we're on MSVC
-#if SYSINFO_VCSTYPE == VCSTYPE_SVN || SYSINFO_VCSTYPE == VCSTYPE_UNKNOWN || defined(WIN32)
+#if !defined(SYSINFO_VCSTYPE) || SYSINFO_VCSTYPE == VCSTYPE_SVN || SYSINFO_VCSTYPE == VCSTYPE_UNKNOWN
 	FILE *fp;
-
-	if (!out)
-		return false;
-	out[0] = '\0';
 
 	// subversion 1.7 uses a sqlite3 database
 	// FIXME this is hackish at best...
 	// - ignores database file structure
 	// - assumes the data in NODES.dav_cache column ends with "!svn/ver/<revision>/<path>)"
 	// - since it's a cache column, the data might not even exist
-	if( (fp = fopen(".svn"PATHSEP_STR"wc.db", "rb")) != NULL || (fp = fopen(".."PATHSEP_STR".svn"PATHSEP_STR"wc.db", "rb")) != NULL ) {
+	if ((fp = fopen(".svn"PATHSEP_STR"wc.db", "rb")) != NULL || (fp = fopen(".."PATHSEP_STR".svn"PATHSEP_STR"wc.db", "rb")) != NULL) {
 
 #ifndef SVNNODEPATH //not sure how to handle branches, so i'll leave this overridable define until a better solution comes up
 #define SVNNODEPATH trunk
@@ -249,22 +229,25 @@ bool sysinfo_svn_get_revision(char *out, int len) {
 		fclose(fp);
 
 		// parse buffer
-		for( i = prefix_len + 1; i + postfix_len <= flen; ++i ) {
-			if( buffer[i] != postfix[0] || memcmp(buffer + i, postfix, postfix_len) != 0 )
+		for (i = prefix_len + 1; i + postfix_len <= flen; ++i) {
+			if (buffer[i] != postfix[0] || memcmp(buffer + i, postfix, postfix_len) != 0)
 				continue; // postfix mismatch
-			for( j = i; j > 0; --j ) { // skip digits
-				if( !ISDIGIT(buffer[j - 1]) )
+			for (j = i; j > 0; --j) { // skip digits
+				if (!ISDIGIT(buffer[j - 1]))
 					break;
 			}
-			if( memcmp(buffer + j - prefix_len, prefix, prefix_len) != 0 )
+			if (memcmp(buffer + j - prefix_len, prefix, prefix_len) != 0)
 				continue; // prefix mismatch
 			// done
-			snprintf(out, len, "%d", atoi(buffer + j));
+			if (*out != NULL)
+				aFree(*out);
+			*out = aCalloc(1, 8);
+			snprintf(*out, 8, "%d", atoi(buffer + j));
 			break;
 		}
 		aFree(buffer);
 
-		if( out[0] != '\0' )
+		if (*out != NULL)
 			return true;
 	}
 
@@ -274,50 +257,53 @@ bool sysinfo_svn_get_revision(char *out, int len) {
 		int rev;
 		// Check the version
 		if (fgets(line, sizeof(line), fp)) {
-			if(!ISDIGIT(line[0])) {
+			if (!ISDIGIT(line[0])) {
 				// XML File format
 				while (fgets(line,sizeof(line),fp))
 					if (strstr(line,"revision=")) break;
 				if (sscanf(line," %*[^\"]\"%d%*[^\n]", &rev) == 1) {
-					snprintf(out, len, "%d", rev);
+					if (*out != NULL)
+						aFree(*out);
+					*out = aCalloc(1, 8);
+					snprintf(*out, 8, "%d", rev);
 				}
 			} else {
 				// Bin File format
-				if ( fgets(line, sizeof(line), fp) == NULL ) { printf("Can't get bin name\n"); } // Get the name
-				if ( fgets(line, sizeof(line), fp) == NULL ) { printf("Can't get entries kind\n"); } // Get the entries kind
-				if(fgets(line, sizeof(line), fp)) { // Get the rev numver
-					snprintf(out, len, "%d", atoi(line));
+				if (fgets(line, sizeof(line), fp) == NULL) { printf("Can't get bin name\n"); } // Get the name
+				if (fgets(line, sizeof(line), fp) == NULL) { printf("Can't get entries kind\n"); } // Get the entries kind
+				if (fgets(line, sizeof(line), fp)) { // Get the rev numver
+					if (*out != NULL)
+						aFree(*out);
+					*out = aCalloc(1, 8);
+					snprintf(*out, 8, "%d", atoi(line));
 				}
 			}
 		}
 		fclose(fp);
 
-		if( out[0] != '\0' )
+		if (*out != NULL)
 			return true;
 	}
-#else
-	if (out)
 #endif
-		safestrncpy(out, "Unknown", len);
+	if (*out != NULL)
+		aFree(*out);
+	*out = NULL;
 	return false;
 }
 
 /**
  * Retrieves the current Git revision.
  *
- * @param out[out] a char buffer to write the output value to.
- * @param len[in]  maximum buffer length.
- * @retval true if a revision was correctly detected.
+ * @param out[out] a string pointer to return the value (to be aFree()'d.)
+ * @retval true  if a revision was correctly detected.
+ * @retval false if no revision was detected. out is set to NULL in this case.
  */
-bool sysinfo_git_get_revision(char *out, int len) {
+bool sysinfo_git_get_revision(char **out) {
 	// Only include Git support if we detected it, or we're on MSVC
-#if SYSINFO_VCSTYPE == VCSTYPE_GIT || SYSINFO_VCSTYPE == VCSTYPE_UNKNOWN || defined(WIN32)
+#if !defined(SYSINFO_VCSTYPE) || SYSINFO_VCSTYPE == VCSTYPE_GIT || SYSINFO_VCSTYPE == VCSTYPE_UNKNOWN
 	FILE *fp;
 	char ref[128], filepath[128], line[128];
 
-	if( !out )
-		return false;
-	out[0] = '\0';
 	strcpy(ref, "HEAD");
 
 	while (*ref) {
@@ -331,18 +317,20 @@ bool sysinfo_git_get_revision(char *out, int len) {
 			if (sscanf(line, "ref: %127[^\n]", ref) == 1) {
 				continue;
 			} else if (sscanf(line, "%127[a-f0-9]", ref) == 1 && strlen(ref) == 40) {
-				safestrncpy(out, ref, 40+1);
+				if (*out != NULL)
+					aFree(*out);
+				*out = aStrdup(ref);
 			}
 		}
 		break;
 	}
-	if( out[0] != '\0' )
+	if (*out != NULL)
 		return true;
-	else
 #else
-	if (out)
+	if (*out != NULL)
+		aFree(*out);
+	*out = NULL;
 #endif
-		safestrncpy(out, "Unknown", len);
 	return false;
 }
 
@@ -354,14 +342,20 @@ typedef BOOL (WINAPI *PGPI)(DWORD, DWORD, DWORD, DWORD, PDWORD);
 /**
  * Retrieves the Operating System version (Windows only).
  *
- * @param StringBuf[in,out] an initialized StringBuf pointer, to return the value into.
- * @retval false if an error happened during version detection.
+ * Once retrieved, the version string is stored into sysinfo->p->osversion.
  */
-bool sysinfo_osversion_retrieve_sub(StringBuf *buf) {
+void sysinfo_osversion_retrieve(void) {
 	OSVERSIONINFOEX osvi;
+	StringBuf buf;
 	ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
+	StrBuf->Init(&buf);
 
 	osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
+
+	if (sysinfo->p->osversion != NULL) {
+		aFree(sysinfo->p->osversion);
+		sysinfo->p->osversion = NULL;
+	}
 
 	/*
 	 * #pragma rantmode (on)
@@ -380,20 +374,22 @@ bool sysinfo_osversion_retrieve_sub(StringBuf *buf) {
 	 */
 #pragma warning (push)
 #pragma warning (disable : 4996)
-	if( !GetVersionEx((OSVERSIONINFO*) &osvi) )
-		return false;
+	if (!GetVersionEx((OSVERSIONINFO*) &osvi)) {
+		sysinfo->p->osversion = aStrdup("Unknown Version");
+		return;
+	}
 #pragma warning (pop)
 
-	if( VER_PLATFORM_WIN32_NT == osvi.dwPlatformId // Windows NT Family
+	if (VER_PLATFORM_WIN32_NT == osvi.dwPlatformId // Windows NT Family
 	 && ((osvi.dwMajorVersion > 4 && osvi.dwMajorVersion < 6) || (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion <= 3)) // Between XP and 8.1
 	) {
-		if( osvi.dwMajorVersion == 6 && osvi.dwMinorVersion <= 3 ) { // Between Vista and 8.1
+		if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion <= 3) { // Between Vista and 8.1
 			PGPI pGPI;
 			DWORD dwType;
-			if( osvi.dwMinorVersion == 0 ) {
-				StrBuf->AppendStr(buf, osvi.wProductType == VER_NT_WORKSTATION ? "Windows Vista" : "Windows Server 2008");
-			} else if( osvi.dwMinorVersion == 1 ) {
-				StrBuf->AppendStr(buf, osvi.wProductType == VER_NT_WORKSTATION ? "Windows 7" : "Windows Server 2008 R2");
+			if (osvi.dwMinorVersion == 0) {
+				StrBuf->AppendStr(&buf, osvi.wProductType == VER_NT_WORKSTATION ? "Windows Vista" : "Windows Server 2008");
+			} else if (osvi.dwMinorVersion == 1) {
+				StrBuf->AppendStr(&buf, osvi.wProductType == VER_NT_WORKSTATION ? "Windows 7" : "Windows Server 2008 R2");
 			} else {
 				// If it's 2, it can be Windows 8, or any newer version (8.1 at the time of writing this) -- see above for the reason.
 				switch (osvi.dwMinorVersion) {
@@ -408,12 +404,12 @@ bool sysinfo_osversion_retrieve_sub(StringBuf *buf) {
 						VER_SET_CONDITION(mask, VER_MAJORVERSION, VER_LESS_EQUAL);
 						VER_SET_CONDITION(mask, VER_MINORVERSION, VER_LESS_EQUAL);
 						if (VerifyVersionInfo(&osvi2, VER_MAJORVERSION | VER_MINORVERSION, mask)) {
-							StrBuf->AppendStr(buf, osvi.wProductType == VER_NT_WORKSTATION ? "Windows 8" : "Windows Server 2012");
+							StrBuf->AppendStr(&buf, osvi.wProductType == VER_NT_WORKSTATION ? "Windows 8" : "Windows Server 2012");
 							break;
 						}
 					}
 				case 3:
-					StrBuf->AppendStr(buf, osvi.wProductType == VER_NT_WORKSTATION ? "Windows 8.1" : "Windows Server 2012 R2");
+					StrBuf->AppendStr(&buf, osvi.wProductType == VER_NT_WORKSTATION ? "Windows 8.1" : "Windows Server 2012 R2");
 				}
 			}
 
@@ -421,23 +417,23 @@ bool sysinfo_osversion_retrieve_sub(StringBuf *buf) {
 
 			pGPI(osvi.dwMajorVersion, osvi.dwMinorVersion, 0, 0, &dwType);
 
-			switch( dwType ) {
+			switch (dwType) {
 				case msPRODUCT_ULTIMATE:
 				case msPRODUCT_ULTIMATE_N:
-					StrBuf->AppendStr(buf, " Ultimate");
+					StrBuf->AppendStr(&buf, " Ultimate");
 					break;
 				case msPRODUCT_PROFESSIONAL:
 				case msPRODUCT_PROFESSIONAL_N:
 				case msPRODUCT_PROFESSIONAL_WMC:
-					StrBuf->AppendStr(buf, " Professional");
+					StrBuf->AppendStr(&buf, " Professional");
 					break;
 				case msPRODUCT_HOME_PREMIUM:
 				case msPRODUCT_HOME_PREMIUM_N:
-					StrBuf->AppendStr(buf, " Home Premium");
+					StrBuf->AppendStr(&buf, " Home Premium");
 					break;
 				case msPRODUCT_HOME_BASIC:
 				case msPRODUCT_HOME_BASIC_N:
-					StrBuf->AppendStr(buf, " Home Basic");
+					StrBuf->AppendStr(&buf, " Home Basic");
 					break;
 				case msPRODUCT_ENTERPRISE:
 				case msPRODUCT_ENTERPRISE_N:
@@ -448,42 +444,42 @@ bool sysinfo_osversion_retrieve_sub(StringBuf *buf) {
 				case msPRODUCT_ENTERPRISE_SERVER_CORE_V:
 				case msPRODUCT_ENTERPRISE_EVALUATION:
 				case msPRODUCT_ENTERPRISE_N_EVALUATION:
-					StrBuf->AppendStr(buf, " Enterprise");
+					StrBuf->AppendStr(&buf, " Enterprise");
 					break;
 				case msPRODUCT_BUSINESS:
 				case msPRODUCT_BUSINESS_N:
-					StrBuf->AppendStr(buf, " Business");
+					StrBuf->AppendStr(&buf, " Business");
 					break;
 				case msPRODUCT_STARTER:
 				case msPRODUCT_STARTER_N:
-					StrBuf->AppendStr(buf, " Starter");
+					StrBuf->AppendStr(&buf, " Starter");
 					break;
 				case msPRODUCT_CLUSTER_SERVER:
 				case msPRODUCT_CLUSTER_SERVER_V:
-					StrBuf->AppendStr(buf, " Cluster Server");
+					StrBuf->AppendStr(&buf, " Cluster Server");
 					break;
 				case msPRODUCT_DATACENTER_SERVER:
 				case msPRODUCT_DATACENTER_SERVER_CORE:
 				case msPRODUCT_DATACENTER_SERVER_V:
 				case msPRODUCT_DATACENTER_SERVER_CORE_V:
 				case msPRODUCT_DATACENTER_EVALUATION_SERVER:
-					StrBuf->AppendStr(buf, " Datacenter");
+					StrBuf->AppendStr(&buf, " Datacenter");
 					break;
 				case msPRODUCT_SMALLBUSINESS_SERVER:
 				case msPRODUCT_SMALLBUSINESS_SERVER_PREMIUM:
 				case msPRODUCT_SMALLBUSINESS_SERVER_PREMIUM_CORE:
-					StrBuf->AppendStr(buf, " Small Business Server");
+					StrBuf->AppendStr(&buf, " Small Business Server");
 					break;
 				case PRODUCT_STANDARD_SERVER:
 				case PRODUCT_STANDARD_SERVER_CORE:
 				case msPRODUCT_STANDARD_SERVER_V:
 				case msPRODUCT_STANDARD_SERVER_CORE_V:
 				case msPRODUCT_STANDARD_EVALUATION_SERVER:
-					StrBuf->AppendStr(buf, " Standard");
+					StrBuf->AppendStr(&buf, " Standard");
 					break;
 				case msPRODUCT_WEB_SERVER:
 				case msPRODUCT_WEB_SERVER_CORE:
-					StrBuf->AppendStr(buf, " Web Server");
+					StrBuf->AppendStr(&buf, " Web Server");
 					break;
 				case msPRODUCT_STORAGE_EXPRESS_SERVER:
 				case msPRODUCT_STORAGE_STANDARD_SERVER:
@@ -495,7 +491,7 @@ bool sysinfo_osversion_retrieve_sub(StringBuf *buf) {
 				case msPRODUCT_STORAGE_ENTERPRISE_SERVER_CORE:
 				case msPRODUCT_STORAGE_WORKGROUP_EVALUATION_SERVER:
 				case msPRODUCT_STORAGE_STANDARD_EVALUATION_SERVER:
-					StrBuf->AppendStr(buf, " Storage Server");
+					StrBuf->AppendStr(&buf, " Storage Server");
 					break;
 				case msPRODUCT_HOME_SERVER:
 				case msPRODUCT_SERVER_FOR_SMALLBUSINESS:
@@ -519,100 +515,84 @@ bool sysinfo_osversion_retrieve_sub(StringBuf *buf) {
 				case msPRODUCT_ESSENTIALBUSINESS_SERVER_ADDLSVC:
 				case msPRODUCT_MULTIPOINT_STANDARD_SERVER:
 				case msPRODUCT_MULTIPOINT_PREMIUM_SERVER:
-					StrBuf->AppendStr(buf, " Server (other)");
+					StrBuf->AppendStr(&buf, " Server (other)");
 					break;
 				case msPRODUCT_CORE_N:
 				case msPRODUCT_CORE_COUNTRYSPECIFIC:
 				case msPRODUCT_CORE_SINGLELANGUAGE:
 				case msPRODUCT_CORE:
-					StrBuf->AppendStr(buf, " Workstation (other)");
+					StrBuf->AppendStr(&buf, " Workstation (other)");
 					break;
 			}
 
-		} else if( osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 2 ) { // XP x64 and Server 2003
-			if( osvi.wProductType == VER_NT_WORKSTATION ) {
-				StrBuf->AppendStr(buf, "Windows XP Professional");
+		} else if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 2) { // XP x64 and Server 2003
+			if (osvi.wProductType == VER_NT_WORKSTATION) {
+				StrBuf->AppendStr(&buf, "Windows XP Professional");
 			} else {
-				if( GetSystemMetrics(msSM_SERVERR2) )
-					StrBuf->AppendStr(buf, "Windows Server 2003 R2");
-				else if( osvi.wSuiteMask & msVER_SUITE_STORAGE_SERVER )
-					StrBuf->AppendStr(buf, "Windows Storage Server 2003");
-				else if( osvi.wSuiteMask & msVER_SUITE_WH_SERVER )
-					StrBuf->AppendStr(buf, "Windows Home Server");
+				if (GetSystemMetrics(msSM_SERVERR2))
+					StrBuf->AppendStr(&buf, "Windows Server 2003 R2");
+				else if (osvi.wSuiteMask & msVER_SUITE_STORAGE_SERVER)
+					StrBuf->AppendStr(&buf, "Windows Storage Server 2003");
+				else if (osvi.wSuiteMask & msVER_SUITE_WH_SERVER)
+					StrBuf->AppendStr(&buf, "Windows Home Server");
 				else
-					StrBuf->AppendStr(buf, "Windows Server 2003");
+					StrBuf->AppendStr(&buf, "Windows Server 2003");
 
 				// Test for the server type.
-				if( osvi.wSuiteMask & msVER_SUITE_COMPUTE_SERVER )
-					StrBuf->AppendStr(buf, " Compute Cluster");
-				else if( osvi.wSuiteMask & VER_SUITE_DATACENTER )
-					StrBuf->AppendStr(buf, " Datacenter");
-				else if( osvi.wSuiteMask & VER_SUITE_ENTERPRISE )
-					StrBuf->AppendStr(buf, " Enterprise");
-				else if( osvi.wSuiteMask & msVER_SUITE_BLADE )
-					StrBuf->AppendStr(buf, " Web");
+				if (osvi.wSuiteMask & msVER_SUITE_COMPUTE_SERVER)
+					StrBuf->AppendStr(&buf, " Compute Cluster");
+				else if (osvi.wSuiteMask & VER_SUITE_DATACENTER)
+					StrBuf->AppendStr(&buf, " Datacenter");
+				else if (osvi.wSuiteMask & VER_SUITE_ENTERPRISE)
+					StrBuf->AppendStr(&buf, " Enterprise");
+				else if (osvi.wSuiteMask & msVER_SUITE_BLADE)
+					StrBuf->AppendStr(&buf, " Web");
 				else
-					StrBuf->AppendStr(buf, " Standard");
+					StrBuf->AppendStr(&buf, " Standard");
 			}
-		} else if( osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 1 ) { // XP
-			StrBuf->AppendStr(buf, "Windows XP");
-			if( osvi.wSuiteMask & VER_SUITE_EMBEDDEDNT ) {
-				StrBuf->AppendStr(buf, " Embedded");
-			} else if( osvi.wSuiteMask & VER_SUITE_PERSONAL ) {
-				StrBuf->AppendStr(buf, " Home");
-			} else {
-				StrBuf->AppendStr(buf, " Professional");
-			}
-		} else if( osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 0 ) { // 2000
-			StrBuf->AppendStr(buf, "Windows 2000");
+		} else if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 1) { // XP
+			StrBuf->AppendStr(&buf, "Windows XP");
+			if (osvi.wSuiteMask & VER_SUITE_EMBEDDEDNT)
+				StrBuf->AppendStr(&buf, " Embedded");
+			else if (osvi.wSuiteMask & VER_SUITE_PERSONAL)
+				StrBuf->AppendStr(&buf, " Home");
+			else
+				StrBuf->AppendStr(&buf, " Professional");
+		} else if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 0) { // 2000
+			StrBuf->AppendStr(&buf, "Windows 2000");
 
-			if( osvi.wProductType == VER_NT_WORKSTATION )
-				StrBuf->AppendStr(buf, " Professional");
-			else if( osvi.wSuiteMask & VER_SUITE_DATACENTER )
-				StrBuf->AppendStr(buf, " Datacenter Server");
-			else if( osvi.wSuiteMask & VER_SUITE_ENTERPRISE )
-				StrBuf->AppendStr(buf, " Advanced Server");
-			else StrBuf->AppendStr(buf, " Server");
+			if (osvi.wProductType == VER_NT_WORKSTATION)
+				StrBuf->AppendStr(&buf, " Professional");
+			else if (osvi.wSuiteMask & VER_SUITE_DATACENTER)
+				StrBuf->AppendStr(&buf, " Datacenter Server");
+			else if (osvi.wSuiteMask & VER_SUITE_ENTERPRISE)
+				StrBuf->AppendStr(&buf, " Advanced Server");
+			else
+				StrBuf->AppendStr(&buf, " Server");
 		} else {
-			StrBuf->Printf(buf, "Unknown Windows version %d.%d", osvi.dwMajorVersion, osvi.dwMinorVersion);
+			StrBuf->Printf(&buf, "Unknown Windows version %d.%d", osvi.dwMajorVersion, osvi.dwMinorVersion);
 		}
 	}
 
 	// Include service pack (if any) and build number.
 
-	if( strlen(osvi.szCSDVersion) > 0 ) {
-		StrBuf->Printf(buf, " %s", osvi.szCSDVersion);
+	if (strlen(osvi.szCSDVersion) > 0) {
+		StrBuf->Printf(&buf, " %s", osvi.szCSDVersion);
 	}
 
-	StrBuf->Printf(buf, " (build %d)", osvi.dwBuildNumber);
+	StrBuf->Printf(&buf, " (build %d)", osvi.dwBuildNumber);
 
-	return true;
-}
-
-/**
- * Retrieves the Operating System version (Windows only).
- *
- * Once retrieved, the version string is stored into sysinfo_osversion_str.
- */
-void sysinfo_osversion_retrieve(void) {
-	StringBuf buf;
-
-	StrBuf->Init(&buf);
-
-	if( sysinfo_osversion_retrieve_sub(&buf) ) {
-		safestrncpy(sysinfo_osversion_str, StrBuf->Value(&buf), BUFSIZE);
-	} else {
-		safestrncpy(sysinfo_osversion_str, "Unknown Version", BUFSIZE);
-	}
+	sysinfo->p->osversion = aStrdup(StrBuf->Value(&buf));
 
 	StrBuf->Destroy(&buf);
+	return true;
 }
 
 typedef void (WINAPI *PGNSI)(LPSYSTEM_INFO);
 /**
  * Retrieves the CPU type (Windows only).
  *
- * Once retrieved, the name is stored into sysinfo_cpu_str.
+ * Once retrieved, the name is stored into sysinfo->p->cpu.
  */
 void sysinfo_cpu_retrieve(void) {
 	StringBuf buf;
@@ -621,14 +601,19 @@ void sysinfo_cpu_retrieve(void) {
 	ZeroMemory(&si, sizeof(SYSTEM_INFO));
 	StrBuf->Init(&buf);
 
+	if (sysinfo->p->cpu != NULL) {
+		aFree(sysinfo->p->cpu);
+		sysinfo->p->cpu = NULL;
+	}
+
 	// Call GetNativeSystemInfo if supported or GetSystemInfo otherwise.
 	pGNSI = (PGNSI) GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")), "GetNativeSystemInfo");
-	if( NULL != pGNSI )
+	if (NULL != pGNSI)
 		pGNSI(&si);
 	else
 		GetSystemInfo(&si);
 
-	if( si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL
+	if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL
 	 || si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64
 	) {
 		StrBuf->Printf(&buf, "%s CPU, Family %d, Model %d, Stepping %d",
@@ -640,7 +625,7 @@ void sysinfo_cpu_retrieve(void) {
 		StrBuf->AppendStr(&buf, "Unknown");
 	}
 
-	safestrncpy(sysinfo_cpu_str, StrBuf->Value(&buf), BUFSIZE);
+	sysinfo->p->cpu = aStrdup(StrBuf->Value(&buf));
 
 	StrBuf->Destroy(&buf);
 }
@@ -648,84 +633,115 @@ void sysinfo_cpu_retrieve(void) {
 /**
  * Retrieves the OS architecture (Windows only).
  *
- * Once retrieved, the name is stored into sysinfo_arch_str.
+ * Once retrieved, the name is stored into sysinfo->p->arch.
  */
 void sysinfo_arch_retrieve(void) {
 	PGNSI pGNSI;
 	SYSTEM_INFO si;
 	ZeroMemory(&si, sizeof(SYSTEM_INFO));
 
+	if (sysinfo->p->arch != NULL) {
+		aFree(sysinfo->p->arch);
+		sysinfo->p->arch = NULL;
+	}
+
 	// Call GetNativeSystemInfo if supported or GetSystemInfo otherwise.
 	pGNSI = (PGNSI) GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")), "GetNativeSystemInfo");
-	if( NULL != pGNSI )
+	if (NULL != pGNSI)
 		pGNSI(&si);
 	else
 		GetSystemInfo(&si);
 
-	if( si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ) // x64
-		safestrncpy(sysinfo_arch_str, "x86_64", BUFSIZE);
-	else if( si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL ) // x32
-		safestrncpy(sysinfo_arch_str, "x86", BUFSIZE);
-	else if( si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ARM ) // ARM
-		safestrncpy(sysinfo_arch_str, "ARM", BUFSIZE);
-	else if( si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64 ) // Itanium
-		safestrncpy(sysinfo_arch_str, "IA-64", BUFSIZE);
+	if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64) // x64
+		sysinfo->p->arch = aStrdup("x86_64");
+	else if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL) // x32
+		sysinfo->p->arch = aStrdup("x86");
+	else if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ARM) // ARM
+		sysinfo->p->arch = aStrdup("ARM");
+	else if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64) // Itanium
+		sysinfo->p->arch = aStrdup("IA-64");
 	else
-		safestrncpy(sysinfo_arch_str, "Unknown", BUFSIZE);
+		sysinfo->p->arch = aStrdup("Unknown");
 }
 
 /**
  * Retrieves the startup-time VCS revision information.
+ *
+ * Once retrieved, the value is stored in sysinfo->p->vcsrevision_src.
  */
 void sysinfo_vcsrevision_src_retrieve(void) {
+	if (sysinfo->p->vcsrevision_src != NULL) {
+		aFree(sysinfo->p->vcsrevision_src);
+		sysinfo->p->vcsrevision_src = NULL;
+	}
 	// Try Git, then SVN
-	if( sysinfo_git_get_revision(SYSINFO_VCSREV, BUFSIZE) ) {
-		SYSINFO_VCSTYPE = VCSTYPE_GIT;
+	if (sysinfo_git_get_revision(&sysinfo->p->vcsrevision_src)) {
+		sysinfo->p->vcstype = VCSTYPE_GIT;
 		return;
 	}
-	if( sysinfo_svn_get_revision(SYSINFO_VCSREV, BUFSIZE) ) {
-		SYSINFO_VCSTYPE = VCSTYPE_SVN;
+	if (sysinfo_svn_get_revision(&sysinfo->p->vcsrevision_src)) {
+		sysinfo->p->vcstype = VCSTYPE_SVN;
 		return;
 	}
-	SYSINFO_VCSTYPE = VCSTYPE_NONE;
+	sysinfo->p->vcstype = VCSTYPE_NONE;
+	sysinfo->p->vcsrevision_src = aStrdup("Unknown");
 }
 #endif // WIN32
+
+/**
+ * Retrieevs the VCS type name.
+ *
+ * Once retrieved, the value is stored in sysinfo->p->vcstype_name.
+ */
+void sysinfo_vcstype_name_retrieve(void) {
+	if (sysinfo->p->vcstype_name != NULL) {
+		aFree(sysinfo->p->vcstype_name);
+		sysinfo->p->vcstype_name = NULL;
+	}
+	switch (sysinfo->p->vcstype) {
+		case VCSTYPE_GIT:
+			sysinfo->p->vcstype_name = aStrdup("Git");
+			break;
+		case VCSTYPE_SVN:
+			sysinfo->p->vcstype_name = aStrdup("SVN");
+			break;
+		default:
+			sysinfo->p->vcstype_name = aStrdup("Exported");
+			break;
+	}
+}
 
 /**
  * Returns the platform (OS type) this application is running on.
  *
  * This information is cached at compile time, since it's unlikely to change.
  *
- * @param out[out] a char buffer to write the output value to.
- * @param len[in]  maximum buffer length.
+ * @return the OS platform name.
+ *
+ * Note: Ownership is NOT transferred, the value should not be freed.
  *
  * Output example: "Linux", "Darwin", "Windows", etc.
  */
-void sysinfo_platform(char *out, size_t len) {
-	if( out )
-		safestrncpy(out, SYSINFO_PLATFORM, len);
+const char *sysinfo_platform(void) {
+	return sysinfo->p->platform;
 }
 
 /**
  * Returns the Operating System version the application is running on.
  *
  * On platforms other than Windows (MSVC), this information is cached at
- *   compile time, since it is uncommon that an application is compiled and run
+ *   compile time, since it is uncommon that an application is compiled and runs
  *   on different machines.
  *
- * @param out[out] a char buffer to write the output value to.
- * @param len[in]  maximum buffer length.
+ * @return the OS name.
+ *
+ * Note: Ownership is NOT transferred, the value should not be freed.
  *
  * Output example: "Windows 2008 Small Business Server", "OS X 10.8 Mountain Lion",
  *   "Gentoo Base System Release 2.2", "Debian GNU/Linux 6.0.6 (squeeze)", etc.
  */
-void sysinfo_osversion(char *out, size_t len) {
-#ifdef WIN32
-	if( !*SYSINFO_OSVERSION )
-		sysinfo_osversion_retrieve();
-#endif
-	if( out )
-		safestrncpy(out, SYSINFO_OSVERSION, len);
+const char *sysinfo_osversion(void) {
+	return sysinfo->p->osversion;
 }
 
 /**
@@ -735,44 +751,36 @@ void sysinfo_osversion(char *out, size_t len) {
  *   brackets.
  *
  * On platforms other than Windows (MSVC), this information is cached at
- *   compile time, since it is uncommon that an application is compiled and run
+ *   compile time, since it is uncommon that an application is compiled and runs
  *   on different machines.
  *
- * @param out[out] a char buffer to write the output value to.
- * @param len[in]  maximum buffer length.
+ * @return the CPU model name.
+ *
+ * Note: Ownership is NOT transferred, the value should not be freed.
  *
  * Output example: "Intel(R) Atom(TM) CPU D2500   @ 1.86GHz [2]",
  *   "Intel(R) Xeon(R) CPU E5-1650 0 @ 3.20GHz [12]", "Intel Core i7 [8]",
  *   "x86 CPU, Family 6, Model 54, Stepping 1", etc.
  */
-void sysinfo_cpu(char *out, size_t len) {
-#ifdef WIN32
-	if( !*SYSINFO_CPU )
-		sysinfo_cpu_retrieve();
-#endif
-	if( out )
-		safestrncpy(out, SYSINFO_CPU, len);
+const char *sysinfo_cpu(void) {
+	return sysinfo->p->cpu;
 }
 
 /**
  * Returns the CPU architecture the application was compiled for.
  *
  * On platforms other than Windows (MSVC), this information is cached at
- *   compile time, since it is uncommon that an application is compiled and run
+ *   compile time, since it is uncommon that an application is compiled and runs
  *   on different machines.
  *
- * @param out[out] a char buffer to write the output value to.
- * @param len[in]  maximum buffer length.
+ * @return the CPU architecture name.
+ *
+ * Note: Ownership is NOT transferred, the value should not be freed.
  *
  * Output example: "x86", "x86_64", "IA-64", "ARM", etc.
  */
-void sysinfo_arch(char *out, size_t len) {
-#ifdef WIN32
-	if( !*SYSINFO_ARCH )
-		sysinfo_arch_retrieve();
-#endif
-	if( out )
-		safestrncpy(out, SYSINFO_ARCH, len);
+const char *sysinfo_arch(void) {
+	return sysinfo->p->arch;
 }
 
 /**
@@ -792,15 +800,15 @@ bool sysinfo_is64bit(void) {
 /**
  * Returns the compiler the application was compiled with.
  *
- * @param out[out] a char buffer to write the output value to.
- * @param len[in]  maximum buffer length.
+ * @return the compiler name.
+ *
+ * Note: Ownership is NOT transferred, the value should not be freed.
  *
  * Output example: "Microsoft Visual C++ 2012 (v170050727)",
  *   "Clang v5.0.0", "MinGW32 v3.20", "GCC v4.7.3", etc.
  */
-void sysinfo_compiler(char *out, size_t len) {
-	if( out )
-		safestrncpy(out, SYSINFO_COMPILER, len);
+const char *sysinfo_compiler(void) {
+	return sysinfo->p->compiler;
 }
 
 /**
@@ -808,14 +816,14 @@ void sysinfo_compiler(char *out, size_t len) {
  *
  * On Windows (MSVC), an empty string is returned instead.
  *
- * @param out[out] a char buffer to write the output value to.
- * @param len[in]  maximum buffer length.
+ * @return the compiler flags.
+ *
+ * Note: Ownership is NOT transferred, the value should not be freed.
  *
  * Output example: "-ggdb -O2 -flto -pipe -ffast-math ..."
  */
-void sysinfo_cflags(char *out, size_t len) {
-	if( out )
-		safestrncpy(out, SYSINFO_CFLAGS, len);
+const char *sysinfo_cflags(void) {
+	return sysinfo->p->cflags;
 }
 
 /**
@@ -825,30 +833,14 @@ void sysinfo_cflags(char *out, size_t len) {
  *   compile time. On Windows (MSVC), it is cached when the function is first
  *   called (most likely on server startup).
  *
- * @param out a char buffer to write the output value to
- * @param len maximum buffer length
+ * @return the VCS type.
+ *
+ * Note: Ownership is NOT transferred, the value should not be freed.
  *
  * Output example: "Git", "SVN", "Exported"
  */
-void sysinfo_vcstype(char *out, size_t len) {
-#ifdef WIN32
-	if( SYSINFO_VCSTYPE == VCSTYPE_UNKNOWN )
-		sysinfo_vcsrevision_src_retrieve();
-#endif // WIN32
-	if( !out )
-		return;
-
-	switch( SYSINFO_VCSTYPE ) {
-		case VCSTYPE_GIT:
-			safestrncpy(out, "Git", len);
-			return;
-		case VCSTYPE_SVN:
-			safestrncpy(out, "SVN", len);
-			return;
-		default:
-			safestrncpy(out, "Exported", len);
-	}
-	return;
+const char *sysinfo_vcstype(void) {
+	return sysinfo->p->vcstype_name;
 }
 
 /**
@@ -859,20 +851,14 @@ void sysinfo_vcstype(char *out, size_t len) {
  *   the function is first called (most likely on server startup), so it may
  *   diverge from the actual revision that was compiled.
  *
- * If no VCS is detected (exported), this will return an empty string.
+ * @return the VCS revision.
  *
- * @param out a char buffer to write the output value to
- * @param len maximum buffer length
+ * Note: Ownership is NOT transferred, the value should not be freed.
  *
  * Output example: Git: "9128feccf3bddda94a7f8a170305565416815b40", SVN: "17546"
  */
-void sysinfo_vcsrevision_src(char *out, size_t len) {
-#ifdef WIN32
-	if( SYSINFO_VCSTYPE == VCSTYPE_UNKNOWN )
-		sysinfo_vcsrevision_src_retrieve();
-#endif // WIN32
-	if( out )
-		safestrncpy(out, SYSINFO_VCSREV, len);
+const char *sysinfo_vcsrevision_src(void) {
+	return sysinfo->p->vcsrevision_src;
 }
 
 /**
@@ -881,19 +867,14 @@ void sysinfo_vcsrevision_src(char *out, size_t len) {
  * This information is cached during a script reload, so that it matches the
  *   version of the loaded scripts.
  *
- * If no VCS is detected (exported), this will return an empty string.
+ * @return the VCS revision.
  *
- * @param out a char buffer to write the output value to
- * @param len maximum buffer length
+ * Note: Ownership is NOT transferred, the value should not be freed.
  *
  * Output example: Git: "9128feccf3bddda94a7f8a170305565416815b40", SVN: "17546"
  */
-void sysinfo_vcsrevision_scripts(char *out, size_t len) {
-	if( !*SYSINFO_VCSREV_RUNTIME )
-		sysinfo->vcsrevision_reload();
-	if( out )
-		safestrncpy(out, SYSINFO_VCSREV_RUNTIME, len);
-
+const char *sysinfo_vcsrevision_scripts(void) {
+	return sysinfo->p->vcsrevision_scripts;
 }
 
 /**
@@ -901,13 +882,72 @@ void sysinfo_vcsrevision_scripts(char *out, size_t len) {
  *   script reloads to refresh the cached version.
  */
 void sysinfo_vcsrevision_reload(void) {
+	if (sysinfo->p->vcsrevision_scripts != NULL) {
+		aFree(sysinfo->p->vcsrevision_scripts);
+		sysinfo->p->vcsrevision_scripts = NULL;
+	}
 	// Try Git, then SVN
-	if( sysinfo_git_get_revision(SYSINFO_VCSREV_RUNTIME, BUFSIZE) ) {
+	if (sysinfo_git_get_revision(&sysinfo->p->vcsrevision_scripts)) {
 		return;
 	}
-	if( sysinfo_svn_get_revision(SYSINFO_VCSREV_RUNTIME, BUFSIZE) ) {
+	if (sysinfo_svn_get_revision(&sysinfo->p->vcsrevision_scripts)) {
 		return;
 	}
+	sysinfo->p->vcsrevision_scripts = aStrdup("Unknown");
+}
+
+/**
+ * Interface runtime initialization.
+ */
+void sysinfo_init(void) {
+	sysinfo->p->compiler = SYSINFO_COMPILER;
+#ifdef WIN32
+	sysinfo->p->platform = "Windows";
+	sysinfo->p->cflags = "N/A";
+	sysinfo_osversion_retrieve();
+	sysinfo_cpu_retrieve();
+	sysinfo_arch_retrieve();
+	sysinfo_vcsrevision_src_retrieve();
+#else
+	sysinfo->p->platform = SYSINFO_PLATFORM;
+	sysinfo->p->osversion = SYSINFO_OSVERSION;
+	sysinfo->p->cpu = SYSINFO_CPU;
+	sysinfo->p->arch = SYSINFO_ARCH;
+	sysinfo->p->cflags = SYSINFO_CFLAGS;
+	sysinfo->p->vcstype = SYSINFO_VCSTYPE;
+	sysinfo->p->vcsrevision_src = SYSINFO_VCSREV;
+#endif
+	sysinfo->vcsrevision_reload();
+	sysinfo_vcstype_name_retrieve(); // Must be called after setting vcstype
+}
+
+/**
+ * Interface shutdown cleanup.
+ */
+void sysinfo_final(void) {
+#ifdef WIN32
+	// Only need to be free'd in win32, they're #defined elsewhere
+	if (sysinfo->p->osversion)
+		aFree(sysinfo->p->osversion);
+	if (sysinfo->p->cpu)
+		aFree(sysinfo->p->cpu);
+	if (sysinfo->p->arch)
+		aFree(sysinfo->p->arch);
+	if (sysinfo->p->vcsrevision_src)
+		aFree(sysinfo->p->vcsrevision_src);
+#endif
+	sysinfo->p->platform = NULL;
+	sysinfo->p->osversion = NULL;
+	sysinfo->p->cpu = NULL;
+	sysinfo->p->arch = NULL;
+	sysinfo->p->vcsrevision_src = NULL;
+	sysinfo->p->cflags = NULL;
+	if (sysinfo->p->vcsrevision_scripts)
+		aFree(sysinfo->p->vcsrevision_scripts);
+	sysinfo->p->vcsrevision_scripts = NULL;
+	if (sysinfo->p->vcstype_name)
+		aFree(sysinfo->p->vcstype_name);
+	sysinfo->p->vcstype_name = NULL;
 }
 
 /**
@@ -915,6 +955,8 @@ void sysinfo_vcsrevision_reload(void) {
  */
 void sysinfo_defaults(void) {
 	sysinfo = &sysinfo_s;
+	memset(&sysinfo_p, '\0', sizeof(sysinfo_p));
+	sysinfo->p = &sysinfo_p;
 
 	sysinfo->platform = sysinfo_platform;
 	sysinfo->osversion = sysinfo_osversion;
@@ -927,4 +969,6 @@ void sysinfo_defaults(void) {
 	sysinfo->vcsrevision_src = sysinfo_vcsrevision_src;
 	sysinfo->vcsrevision_scripts = sysinfo_vcsrevision_scripts;
 	sysinfo->vcsrevision_reload = sysinfo_vcsrevision_reload;
+	sysinfo->init = sysinfo_init;
+	sysinfo->final = sysinfo_final;
 }
