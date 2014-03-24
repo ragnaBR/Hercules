@@ -41,6 +41,8 @@ EOF
 [ $? -eq 0 ] || do_fail
 
 HERC_PLATFORM="$( uname -s )"
+HERC_CORES="0"
+HERC_CPU="Unknown"
 
 case $HERC_PLATFORM in
 	Linux)
@@ -140,9 +142,8 @@ case $HERC_PLATFORM in
 		fi
 		HERC_OSVERSION="$DIST"
 
-		HWDATA_CPU="$( cat /proc/cpuinfo | grep "model name" | head -n 1 | cut -d: -f2- )"
-		HWDATA_CPUCORES="$( cleanstring "$( grep '^processor' /proc/cpuinfo | wc -l )" )"
-		HERC_CPU="${HWDATA_CPU} [${HWDATA_CPUCORES}]"
+		HERC_CPU="$( cat /proc/cpuinfo | grep "model name" | head -n 1 | cut -d: -f2- )"
+		HERC_CORES="$( grep '^processor' /proc/cpuinfo | wc -l )"
 		;;
 	Darwin)
 		HERC_PLATFORM="Mac OS X"
@@ -155,49 +156,40 @@ case $HERC_PLATFORM in
 			HWDATA="$( system_profiler SPHardwareDataType )"
 			HWDATA_CPU="$( echo "$HWDATA" | grep "Processor Name:" | cut -d: -f2- )"
 			HWDATA_CPUSPEED="$( cleanstring "$( echo "$HWDATA" | grep "Processor Speed:" | cut -d: -f2- )" )"
-			HWDATA_CPUCORES="$( cleanstring "$( echo "$HWDATA" | grep "Total Number of Cores:" | cut -d: -f2- )" )"
-			HERC_CPU="${HWDATA_CPU} (${HWDATA_CPUSPEED}) [${HWDATA_CPUCORES}]"
-		else
-			HERC_CPU="Unknown"
+			HERC_CORES="$( echo "$HWDATA" | grep "Total Number of Cores:" | cut -d: -f2- )"
+			HERC_CPU="${HWDATA_CPU} (${HWDATA_CPUSPEED})"
 		fi
 		;;
 	SunOS)
 		HERC_PLATFORM="Solaris"
 		HERC_OSVERSION="${HERC_PLATFORM} $( uname -r ) ($( uname -p) $(uname -v))"
-		HERC_CPU="Unknown"
 		;;
 	AIX)
 		HERC_OSVERSION="AIX $( oslevel ) ($(`oslevel -r`))"
-		HERC_CPU="Unknown"
 		;;
 	CYGWIN*)
 		HERC_PLATFORM="Cygwin Windows"
 		HERC_OSVERSION="$( cleanstring "$( uname -s )" )"
-		HWDATA_CPU="$( cat /proc/cpuinfo | grep "model name" | head -n 1 | cut -d: -f2- )"
-		HWDATA_CPUCORES="$( cleanstring "$( grep '^processor' /proc/cpuinfo | wc -l )" )"
-		HERC_CPU="${HWDATA_CPU} [${HWDATA_CPUCORES}]"
+		HERC_CPU="$( cat /proc/cpuinfo | grep "model name" | head -n 1 | cut -d: -f2- )"
+		HERC_CORES="$( grep '^processor' /proc/cpuinfo | wc -l )"
 		;;
 	OpenBSD)
 		HERC_OSVERSION="${HERC_PLATFORM} $( uname -r ) ($( uname -p) $(uname -v))"
-		HWDATA_CPU="$( cleanstring "$( sysctl hw.model | cut -d= -f2- )" )"
-		HWDATA_CPUCORES="$( cleanstring "$( sysctl hw.ncpu | cut -d= -f2- )" )"
-		HERC_CPU="${HWDATA_CPU} [${HWDATA_CPUCORES}]"
+		HERC_CPU="$( sysctl hw.model | cut -d= -f2- )"
+		HERC_CORES="$( sysctl hw.ncpu | cut -d= -f2- )"
 		;;
 	FreeBSD)
 		HERC_OSVERSION="${HERC_PLATFORM} $( uname -r ) ($( uname -p))"
-		HWDATA_CPU="$( cleanstring "$( sysctl hw.model | cut -d: -f2- )" )"
-		HWDATA_CPUCORES="$( cleanstring "$( sysctl hw.ncpu | cut -d: -f2- )" )"
-		HERC_CPU="${HWDATA_CPU} [${HWDATA_CPUCORES}]"
+		HERC_CPU="$( sysctl hw.model | cut -d: -f2- )"
+		HERC_CORES="$( sysctl hw.ncpu | cut -d: -f2- )"
 		;;
 	NetBSD)
 		HERC_OSVERSION="${HERC_PLATFORM} $( uname -r ) ($( uname -p))"
-		HWDATA_CPU="$( cleanstring "$( sysctl hw.model | cut -d= -f2- )" )"
-		HWDATA_CPUCORES="$( cleanstring "$( sysctl hw.ncpu | cut -d= -f2- )" )"
-		HERC_CPU="${HWDATA_CPU} [${HWDATA_CPUCORES}]"
+		HERC_CPU="$( sysctl hw.model | cut -d= -f2- )"
+		HERC_CORES="$( sysctl hw.ncpu | cut -d= -f2- )"
 		;;
 	*)
 		HERC_OSVERSION="Unknown"
-		HERC_CPU="Unknown"
 		;;
 esac
 
@@ -210,6 +202,9 @@ cat >> "$OUTFILE" << EOF
 
 // CPU Model (Platform-dependent)
 #define SYSINFO_CPU "$( cleanstring "${HERC_CPU}" )"
+
+// CPU Cores (Platform-dependent)
+#define SYSINFO_CPUCORES ( $( cleanstring "${HERC_CORES}" ) )
 
 EOF
 [ $? -eq 0 ] || do_fail

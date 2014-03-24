@@ -18,6 +18,7 @@ struct sysinfo_private {
 	char *platform;
 	char *osversion;
 	char *cpu;
+	int cpucores;
 	char *arch;
 	char *compiler;
 	char *cflags;
@@ -39,11 +40,13 @@ struct sysinfo_interface {
 	const char *(*platform) (void);
 	const char *(*osversion) (void);
 	const char *(*cpu) (void);
+	int (*cpucores) (void);
 	const char *(*arch) (void);
 	bool (*is64bit) (void);
 	const char *(*compiler) (void);
 	const char *(*cflags) (void);
 	const char *(*vcstype) (void);
+	int (*vcstypeid) (void);
 	const char *(*vcsrevision_src) (void);
 	const char *(*vcsrevision_scripts) (void);
 	void (*vcsrevision_reload) (void);

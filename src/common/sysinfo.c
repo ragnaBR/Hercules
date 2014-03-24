@@ -592,7 +592,8 @@ typedef void (WINAPI *PGNSI)(LPSYSTEM_INFO);
 /**
  * Retrieves the CPU type (Windows only).
  *
- * Once retrieved, the name is stored into sysinfo->p->cpu.
+ * Once retrieved, the name is stored into sysinfo->p->cpu and the
+ * number of cores in sysinfo->p->cpucores.
  */
 void sysinfo_cpu_retrieve(void) {
 	StringBuf buf;
@@ -626,6 +627,7 @@ void sysinfo_cpu_retrieve(void) {
 	}
 
 	sysinfo->p->cpu = aStrdup(StrBuf->Value(&buf));
+	sysinfo->p->cpucores = si.dwNumberOfProcessors;
 
 	StrBuf->Destroy(&buf);
 }
@@ -747,9 +749,6 @@ const char *sysinfo_osversion(void) {
 /**
  * Returns the CPU model the application is running on.
  *
- * Where available, the number of cores/CPUs is appended to the name, in square
- *   brackets.
- *
  * On platforms other than Windows (MSVC), this information is cached at
  *   compile time, since it is uncommon that an application is compiled and runs
  *   on different machines.
@@ -758,12 +757,25 @@ const char *sysinfo_osversion(void) {
  *
  * Note: Ownership is NOT transferred, the value should not be freed.
  *
- * Output example: "Intel(R) Atom(TM) CPU D2500   @ 1.86GHz [2]",
- *   "Intel(R) Xeon(R) CPU E5-1650 0 @ 3.20GHz [12]", "Intel Core i7 [8]",
+ * Output example: "Intel(R) Atom(TM) CPU D2500   @ 1.86GHz",
+ *   "Intel(R) Xeon(R) CPU E5-1650 0 @ 3.20GHz", "Intel Core i7",
  *   "x86 CPU, Family 6, Model 54, Stepping 1", etc.
  */
 const char *sysinfo_cpu(void) {
 	return sysinfo->p->cpu;
+}
+
+/**
+ * Returns the number of CPU cores available.
+ *
+ * On platforms other than Windows (MSVC), this information is cached at
+ *   compile time, since it is uncommon that an application is compiled and runs
+ *   on different machines.
+ *
+ * @return the number of CPU cores.
+ */
+int sysinfo_cpucores(void) {
+	return sysinfo->p->cpucores;
 }
 
 /**
@@ -824,6 +836,21 @@ const char *sysinfo_compiler(void) {
  */
 const char *sysinfo_cflags(void) {
 	return sysinfo->p->cflags;
+}
+
+/**
+ * Returns the Version Control System the application was downloaded with.
+ *
+ * On platforms other than Windows (MSVC), this information is cached at
+ *   compile time. On Windows (MSVC), it is cached when the function is first
+ *   called (most likely on server startup).
+ *
+ * @return the VCS type (numerical).
+ *
+ * @see VCSTYPE_NONE, VCSTYPE_GIT, VCSTYPE_SVN, VCSTYPE_UNKNOWN
+ */
+int sysinfo_vcstypeid(void) {
+	return sysinfo->p->vcstype;
 }
 
 /**
@@ -911,6 +938,7 @@ void sysinfo_init(void) {
 #else
 	sysinfo->p->platform = SYSINFO_PLATFORM;
 	sysinfo->p->osversion = SYSINFO_OSVERSION;
+	sysinfo->p->cpucores = SYSINFO_CPUCORES;
 	sysinfo->p->cpu = SYSINFO_CPU;
 	sysinfo->p->arch = SYSINFO_ARCH;
 	sysinfo->p->cflags = SYSINFO_CFLAGS;
@@ -961,11 +989,13 @@ void sysinfo_defaults(void) {
 	sysinfo->platform = sysinfo_platform;
 	sysinfo->osversion = sysinfo_osversion;
 	sysinfo->cpu = sysinfo_cpu;
+	sysinfo->cpucores = sysinfo_cpucores;
 	sysinfo->arch = sysinfo_arch;
 	sysinfo->is64bit = sysinfo_is64bit;
 	sysinfo->compiler = sysinfo_compiler;
 	sysinfo->cflags = sysinfo_cflags;
 	sysinfo->vcstype = sysinfo_vcstype;
+	sysinfo->vcstypeid = sysinfo_vcstypeid;
 	sysinfo->vcsrevision_src = sysinfo_vcsrevision_src;
 	sysinfo->vcsrevision_scripts = sysinfo_vcsrevision_scripts;
 	sysinfo->vcsrevision_reload = sysinfo_vcsrevision_reload;

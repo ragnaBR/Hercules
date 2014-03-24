@@ -61,7 +61,7 @@ void display_title(void) {
 	ShowInfo("%s revision (src): '"CL_WHITE"%s"CL_RESET"'\n", vcstype, sysinfo->vcsrevision_src());
 	ShowInfo("%s revision (scripts): '"CL_WHITE"%s"CL_RESET"'\n", vcstype, sysinfo->vcsrevision_scripts());
 	ShowInfo("OS version: '"CL_WHITE"%s"CL_RESET" [%s]'\n", sysinfo->osversion(), sysinfo->arch());
-	ShowInfo("CPU: '"CL_WHITE"%s"CL_RESET"'\n", sysinfo->cpu());
+	ShowInfo("CPU: '"CL_WHITE"%s [%d]"CL_RESET"'\n", sysinfo->cpu(), sysinfo->cpucores());
 	ShowInfo("Compiled with %s\n", sysinfo->compiler());
 	ShowInfo("Compile Flags: %s\n", sysinfo->cflags());
 }
