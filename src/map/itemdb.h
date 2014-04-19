@@ -19,7 +19,7 @@ struct item_package;
  * Defines
  **/
 #define MAX_ITEMDB 0x10000 // 65K array entries in array (the rest goes to the db)
-//If you define MAX_ITEMDB over 65k arrays entries (item ids), you have to define the flag bellow AND apply the sql patch patch_itemdb_over65k.sql located insed of sql forlder to your database.
+//If you define MAX_ITEMDB over 65k arrays entries (item ids), you have to define the flag bellow AND apply the sql patch patch_itemdb_over65k.sql located inside of sql folder to your database.
 //#define ITEMDB_OVER65K
 #define MAX_ITEMDELAYS 10 // The maximum number of item delays
 #define MAX_SEARCH 5 //Designed for search functions, species max number of matches to display.
