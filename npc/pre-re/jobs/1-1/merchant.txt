@@ -494,7 +494,7 @@ S_GiveSerial:
 	next;
 	mes "[Chief Mahnsoo]";
 	mes "Remember...";
-	if (rand(1)) {
+	if (rand(2)) {
 		mes "The package's";
 		mes "Serial Number is";
 		mes "^3355FF"+getarg(0)+"^000000.";
@@ -710,9 +710,9 @@ alberta_in,28,29,2	script	Merchant Guildsman#mer	4_M_01,{
 						mes "[Union Staff Kay]";
 						mes "Hey hey. That number's not valid! Enter a value from 1000000 to 5000000. got it?";
 						next;
-					}
-					else 
+					} else {
 						break;
+					}
 				}
 				mes "[Union Staff Kay]";
 				if (.@where_village == 1)

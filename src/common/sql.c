@@ -2,19 +2,23 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
+#define HERCULES_CORE
+
+#include "sql.h"
+
+#include <stdlib.h> // strtoul
+#include <string.h> // strlen/strnlen/memcpy/memset
+
 #include "../common/cbasetypes.h"
 #include "../common/malloc.h"
 #include "../common/showmsg.h"
 #include "../common/strlib.h"
 #include "../common/timer.h"
-#include "sql.h"
 
 #ifdef WIN32
-#include "../common/winapi.h"
+#	include "../common/winapi.h" // Needed before mysql.h
 #endif
 #include <mysql.h>
-#include <string.h>// strlen/strnlen/memcpy/memset
-#include <stdlib.h>// strtoul
 
 void hercules_mysql_error_handler(unsigned int ecode);
 
@@ -34,7 +38,7 @@ struct Sql {
 
 
 // Column length receiver.
-// Takes care of the possible size missmatch between uint32 and unsigned long.
+// Takes care of the possible size mismatch between uint32 and unsigned long.
 struct s_column_length {
 	uint32* out_length;
 	unsigned long length;
@@ -238,8 +242,8 @@ size_t Sql_EscapeStringLen(Sql* self, char *out_to, const char *from, size_t fro
 
 
 /// Executes a query.
-int Sql_Query(Sql* self, const char* query, ...)
-{
+int Sql_Query(Sql *self, const char *query, ...) __attribute__((format(printf, 2, 3)));
+int Sql_Query(Sql *self, const char *query, ...) {
 	int res;
 	va_list args;
 
@@ -398,8 +402,7 @@ void Sql_ShowDebug_(Sql* self, const char* debug_file, const unsigned long debug
 
 
 /// Frees a Sql handle returned by Sql_Malloc.
-void Sql_Free(Sql* self) 
-{
+void Sql_Free(Sql* self) {
 	if( self )
 	{
 		SQL->FreeResult(self);
@@ -514,15 +517,13 @@ static int Sql_P_BindSqlDataType(MYSQL_BIND* bind, enum SqlDataType buffer_type,
 /// Prints debug information about a field (type and length).
 ///
 /// @private
-static void Sql_P_ShowDebugMysqlFieldInfo(const char* prefix, enum enum_field_types type, int is_unsigned, unsigned long length, const char* length_postfix)
-{
-	const char* sign = (is_unsigned ? "UNSIGNED " : "");
-	const char* type_string;
-	switch( type )
-	{
-	default:
-		ShowDebug("%stype=%s%u, length=%d\n", prefix, sign, type, length);
-		return;
+static void Sql_P_ShowDebugMysqlFieldInfo(const char* prefix, enum enum_field_types type, int is_unsigned, unsigned long length, const char* length_postfix) {
+	const char *sign = (is_unsigned ? "UNSIGNED " : "");
+	const char *type_string = NULL;
+	switch (type) {
+		default:
+			ShowDebug("%stype=%s%u, length=%lu\n", prefix, sign, type, length);
+			return;
 #define SHOW_DEBUG_OF(x) case x: type_string = #x; break
 		SHOW_DEBUG_OF(MYSQL_TYPE_TINY);
 		SHOW_DEBUG_OF(MYSQL_TYPE_SHORT);
@@ -545,7 +546,7 @@ static void Sql_P_ShowDebugMysqlFieldInfo(const char* prefix, enum enum_field_ty
 		SHOW_DEBUG_OF(MYSQL_TYPE_NULL);
 #undef SHOW_DEBUG_TYPE_OF
 	}
-	ShowDebug("%stype=%s%s, length=%d%s\n", prefix, sign, type_string, length, length_postfix); 
+	ShowDebug("%stype=%s%s, length=%lu%s\n", prefix, sign, type_string, length, length_postfix);
 }
 
 
@@ -566,7 +567,7 @@ static void SqlStmt_P_ShowDebugTruncatedColumn(SqlStmt* self, size_t i)
 	Sql_P_ShowDebugMysqlFieldInfo("data   - ", field->type, field->flags&UNSIGNED_FLAG, self->column_lengths[i].length, "");
 	column = &self->columns[i];
 	if( column->buffer_type == MYSQL_TYPE_STRING )
-		Sql_P_ShowDebugMysqlFieldInfo("buffer - ", column->buffer_type, column->is_unsigned, column->buffer_length, "+1(nul-terminator)");
+		Sql_P_ShowDebugMysqlFieldInfo("buffer - ", column->buffer_type, column->is_unsigned, column->buffer_length, "+1(null-terminator)");
 	else
 		Sql_P_ShowDebugMysqlFieldInfo("buffer - ", column->buffer_type, column->is_unsigned, column->buffer_length, "");
 	mysql_free_result(meta);
@@ -604,8 +605,8 @@ SqlStmt* SqlStmt_Malloc(Sql* sql) {
 
 
 /// Prepares the statement.
-int SqlStmt_Prepare(SqlStmt* self, const char* query, ...)
-{
+int SqlStmt_Prepare(SqlStmt *self, const char *query, ...) __attribute__((format(printf, 2, 3)));
+int SqlStmt_Prepare(SqlStmt *self, const char *query, ...) {
 	int res;
 	va_list args;
 
@@ -753,19 +754,16 @@ size_t SqlStmt_NumColumns(SqlStmt* self)
 
 
 /// Binds the result of a column to a buffer.
-int SqlStmt_BindColumn(SqlStmt* self, size_t idx, enum SqlDataType buffer_type, void* buffer, size_t buffer_len, uint32* out_length, int8* out_is_null)
-{
-	if( self == NULL )
+int SqlStmt_BindColumn(SqlStmt *self, size_t idx, enum SqlDataType buffer_type, void *buffer, size_t buffer_len, uint32 *out_length, int8 *out_is_null) {
+	if (self == NULL)
 		return SQL_ERROR;
 
-	if( buffer_type == SQLDT_STRING || buffer_type == SQLDT_ENUM )
-	{
-		if( buffer_len < 1 )
-		{
-			ShowDebug("SqlStmt_BindColumn: buffer_len(%d) is too small, no room for the nul-terminator\n", buffer_len);
+	if (buffer_type == SQLDT_STRING || buffer_type == SQLDT_ENUM) {
+		if (buffer_len < 1) {
+			ShowDebug("SqlStmt_BindColumn: buffer_len(%"PRIuS") is too small, no room for the null-terminator\n", buffer_len);
 			return SQL_ERROR;
 		}
-		--buffer_len;// nul-terminator
+		--buffer_len;// null-terminator
 	}
 	if( !self->bind_columns )
 	{// initialize the bindings
@@ -888,7 +886,7 @@ int SqlStmt_NextRow(SqlStmt* self)
 		if( self->column_lengths[i].out_length )
 			*self->column_lengths[i].out_length = (uint32)length;
 		if( column->buffer_type == MYSQL_TYPE_STRING )
-		{// clear unused part of the string/enum buffer (and nul-terminate)
+		{// clear unused part of the string/enum buffer (and null-terminate)
 			memset((char*)column->buffer + length, 0, column->buffer_length - length + 1);
 		}
 		else if( column->buffer_type == MYSQL_TYPE_BLOB && length < column->buffer_length )
@@ -971,9 +969,9 @@ void Sql_inter_server_read(const char* cfgName, bool first) {
 		return;
 	}
 
-	while(fgets(line, sizeof(line), fp)) {
-		i = sscanf(line, "%[^:]: %[^\r\n]", w1, w2);
-		if(i != 2)
+	while (fgets(line, sizeof(line), fp)) {
+		i = sscanf(line, "%1023[^:]: %1023[^\r\n]", w1, w2);
+		if (i != 2)
 			continue;
 
 		if(!strcmpi(w1,"mysql_reconnect_type")) {

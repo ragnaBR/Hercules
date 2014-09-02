@@ -2,48 +2,50 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#include "../common/cbasetypes.h"
-#include "../common/mmo.h"
-#include "../common/timer.h"
-#include "../common/malloc.h"
-#include "../common/showmsg.h"
-#include "../common/strlib.h"
-#include "../config/core.h"
-#include "../common/HPM.h"
+#define HERCULES_CORE
 
-#define _H_SOCKET_C_
-
+#include "../config/core.h" // SHOW_SERVER_STATS
+#define H_SOCKET_C
 #include "socket.h"
+#undef H_SOCKET_C
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 
+#include "../common/HPM.h"
+#include "../common/cbasetypes.h"
+#include "../common/malloc.h"
+#include "../common/mmo.h"
+#include "../common/showmsg.h"
+#include "../common/strlib.h"
+#include "../common/timer.h"
+
 #ifdef WIN32
-	#include "../common/winapi.h"
+#	include "../common/winapi.h"
 #else
-	#include <errno.h>
-	#include <sys/socket.h>
-	#include <netinet/in.h>
-	#include <netinet/tcp.h>
-	#include <net/if.h>
-	#include <unistd.h>
-	#include <sys/time.h>
-	#include <sys/ioctl.h>
-	#include <netdb.h>
-	#include <arpa/inet.h>
+#	include <arpa/inet.h>
+#	include <errno.h>
+#	include <net/if.h>
+#	include <netdb.h>
+#	include <netinet/in.h>
+#	include <netinet/tcp.h>
+#	include <sys/ioctl.h>
+#	include <sys/socket.h>
+#	include <sys/time.h>
+#	include <unistd.h>
 
-	#ifndef SIOCGIFCONF
-	#include <sys/sockio.h> // SIOCGIFCONF on Solaris, maybe others? [Shinomori]
-	#endif
-	#ifndef FIONBIO
-	#include <sys/filio.h> // FIONBIO on Solaris [FlavioJS]
-	#endif
+#	ifndef SIOCGIFCONF
+#		include <sys/sockio.h> // SIOCGIFCONF on Solaris, maybe others? [Shinomori]
+#	endif
+#	ifndef FIONBIO
+#		include <sys/filio.h> // FIONBIO on Solaris [FlavioJS]
+#	endif
 
-	#ifdef HAVE_SETRLIMIT
-	#include <sys/resource.h>
-	#endif
+#	ifdef HAVE_SETRLIMIT
+#		include <sys/resource.h>
+#	endif
 #endif
 
 /**
@@ -62,7 +64,7 @@ struct socket_interface sockt_s;
 /////////////////////////////////////////////////////////////////////
 #if defined(WIN32)
 /////////////////////////////////////////////////////////////////////
-// windows portability layer 
+// windows portability layer
 
 typedef int socklen_t;
 
@@ -108,7 +110,7 @@ int sock2fd(SOCKET s)
 
 /// Inserts the socket into the global array of sockets.
 /// Returns a new fd associated with the socket.
-/// If there are too many sockets it closes the socket, sets an error and 
+/// If there are too many sockets it closes the socket, sets an error and
 //  returns -1 instead.
 /// Since fd 0 is reserved, it returns values in the range [1,FD_SETSIZE[.
 ///
@@ -291,8 +293,8 @@ void set_defaultparse(ParseFunc defaultparse)
  *--------------------------------------*/
 void set_nonblocking(int fd, unsigned long yes)
 {
-	// FIONBIO Use with a nonzero argp parameter to enable the nonblocking mode of socket s. 
-	// The argp parameter is zero if nonblocking is to be disabled. 
+	// FIONBIO Use with a nonzero argp parameter to enable the nonblocking mode of socket s.
+	// The argp parameter is zero if nonblocking is to be disabled.
 	if( sIoctl(fd, FIONBIO, &yes) != 0 )
 		ShowError("set_nonblocking: Failed to set socket #%d to non-blocking mode (%s) - Please report this!!!\n", fd, error_msg());
 }
@@ -358,7 +360,7 @@ int recv_to_fifo(int fd)
 	len = sRecv(fd, (char *) session[fd]->rdata + session[fd]->rdata_size, (int)RFIFOSPACE(fd), 0);
 
 	if( len == SOCKET_ERROR )
-	{//An exception has occured
+	{//An exception has occurred
 		if( sErrno != S_EWOULDBLOCK ) {
 			//ShowDebug("recv_to_fifo: %s, closing connection #%d\n", error_msg(), fd);
 			set_eof(fd);
@@ -398,7 +400,7 @@ int send_from_fifo(int fd)
 	len = sSend(fd, (const char *) session[fd]->wdata, (int)session[fd]->wdata_size, MSG_NOSIGNAL);
 
 	if( len == SOCKET_ERROR )
-	{//An exception has occured
+	{//An exception has occurred
 		if( sErrno != S_EWOULDBLOCK ) {
 			//ShowDebug("send_from_fifo: %s, ending connection #%d\n", error_msg(), fd);
 #ifdef SHOW_SERVER_STATS
@@ -687,8 +689,8 @@ int RFIFOSKIP(int fd, size_t len)
 
 	s = session[fd];
 
-	if ( s->rdata_size < s->rdata_pos + len ) {
-		ShowError("RFIFOSKIP: skipped past end of read buffer! Adjusting from %d to %d (session #%d)\n", len, RFIFOREST(fd), fd);
+	if (s->rdata_size < s->rdata_pos + len) {
+		ShowError("RFIFOSKIP: skipped past end of read buffer! Adjusting from %"PRIuS" to %"PRIuS" (session #%d)\n", len, RFIFOREST(fd), fd);
 		len = RFIFOREST(fd);
 	}
 
@@ -736,13 +738,15 @@ int WFIFOSET(int fd, size_t len)
 
 	if( !s->flag.server ) {
 
-		if( len > socket_max_client_packet ) {// see declaration of socket_max_client_packet for details
-			ShowError("WFIFOSET: Dropped too large client packet 0x%04x (length=%u, max=%u).\n", WFIFOW(fd,0), len, socket_max_client_packet);
+		if (len > socket_max_client_packet) { // see declaration of socket_max_client_packet for details
+			ShowError("WFIFOSET: Dropped too large client packet 0x%04x (length=%"PRIuS", max=%"PRIuS").\n",
+			          WFIFOW(fd,0), len, socket_max_client_packet);
 			return 0;
 		}
 
-		if( s->wdata_size+len > WFIFO_MAX ) {// reached maximum write fifo size
-			ShowError("WFIFOSET: Maximum write buffer size for client connection %d exceeded, most likely caused by packet 0x%04x (len=%u, ip=%lu.%lu.%lu.%lu).\n", fd, WFIFOW(fd,0), len, CONVIP(s->client_addr));
+		if (s->wdata_size+len > WFIFO_MAX) { // reached maximum write fifo size
+			ShowError("WFIFOSET: Maximum write buffer size for client connection %d exceeded, most likely caused by packet 0x%04x (len=%"PRIuS", ip=%u.%u.%u.%u).\n",
+			          fd, WFIFOW(fd,0), len, CONVIP(s->client_addr));
 			set_eof(fd);
 			return 0;
 		}
@@ -843,7 +847,7 @@ int do_sockets(int next)
 			session[i]->func_send(i);
 
 		if(session[i]->flag.eof) //func_send can't free a session, this is safe.
-		{	//Finally, even if there is no data to parse, connections signalled eof should be closed, so we call parse_func [Skotlex]
+		{	//Finally, even if there is no data to parse, connections signaled eof should be closed, so we call parse_func [Skotlex]
 			session[i]->func_parse(i); //This should close the session immediately.
 		}
 	}
@@ -907,20 +911,20 @@ int do_sockets(int next)
 //////////////////////////////
 // IP rules and DDoS protection
 
-typedef struct _connect_history {
-	struct _connect_history* next;
+typedef struct connect_history {
+	struct connect_history* next;
 	uint32 ip;
 	int64 tick;
 	int count;
 	unsigned ddos : 1;
 } ConnectHistory;
 
-typedef struct _access_control {
+typedef struct access_control {
 	uint32 ip;
 	uint32 mask;
 } AccessControl;
 
-enum _aco {
+enum aco {
 	ACO_DENY_ALLOW,
 	ACO_ALLOW_DENY,
 	ACO_MUTUAL_FAILURE
@@ -1150,11 +1154,10 @@ int socket_config_read(const char* cfgName)
 		return 1;
 	}
 
-	while(fgets(line, sizeof(line), fp))
-	{
+	while (fgets(line, sizeof(line), fp)) {
 		if(line[0] == '/' && line[1] == '/')
 			continue;
-		if(sscanf(line, "%[^:]: %[^\r\n]", w1, w2) != 2)
+		if (sscanf(line, "%1023[^:]: %1023[^\r\n]", w1, w2) != 2)
 			continue;
 
 		if (!strcmpi(w1, "stall_time")) {
@@ -1232,7 +1235,7 @@ void socket_final(void)
 		if(session[i])
 			sockt->close(i);
 
-	// session[0] のダミーデータを削除
+	// session[0]
 	aFree(session[0]->rdata);
 	aFree(session[0]->wdata);
 	aFree(session[0]);
@@ -1362,7 +1365,7 @@ void socket_init(void)
 		}
 	}
 #elif defined(HAVE_SETRLIMIT) && !defined(CYGWIN)
-	// NOTE: getrlimit and setrlimit have bogus behaviour in cygwin.
+	// NOTE: getrlimit and setrlimit have bogus behavior in cygwin.
 	//       "Number of fds is virtually unlimited in cygwin" (sys/param.h)
 	{// set socket limit to FD_SETSIZE
 		struct rlimit rlp;
@@ -1403,7 +1406,7 @@ void socket_init(void)
 	
 	socket_config_read(SOCKET_CONF_FILENAME);
 
-	// initialise last send-receive tick
+	// initialize last send-receive tick
 	sockt->last_tick = time(NULL);
 
 	// session[0] is now currently used for disconnected sessions of the map server, and as such,
@@ -1456,7 +1459,7 @@ uint32 str2ip(const char* ip_str)
 }
 
 // Reorders bytes from network to little endian (Windows).
-// Neccessary for sending port numbers to the RO client until Gravity notices that they forgot ntohs() calls.
+// Necessary for sending port numbers to the RO client until Gravity notices that they forgot ntohs() calls.
 uint16 ntows(uint16 netshort)
 {
 	return ((netshort & 0xFF) << 8) | ((netshort & 0xFF00) >> 8);
@@ -1543,9 +1546,9 @@ void send_shortlist_add_fd(int fd)
 	if( (send_shortlist_set[i]>>bit)&1 )
 		return;// already in the list
 
-	if( send_shortlist_count >= ARRAYLENGTH(send_shortlist_array) )
-	{
-		ShowDebug("send_shortlist_add_fd: shortlist is full, ignoring... (fd=%d shortlist.count=%d shortlist.length=%d)\n", fd, send_shortlist_count, ARRAYLENGTH(send_shortlist_array));
+	if (send_shortlist_count >= ARRAYLENGTH(send_shortlist_array)) {
+		ShowDebug("send_shortlist_add_fd: shortlist is full, ignoring... (fd=%d shortlist.count=%d shortlist.length=%"PRIuS")\n",
+		          fd, send_shortlist_count, ARRAYLENGTH(send_shortlist_array));
 		return;
 	}
 

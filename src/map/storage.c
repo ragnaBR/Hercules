@@ -2,27 +2,28 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#include "../common/cbasetypes.h"
-#include "../common/db.h"
-#include "../common/nullpo.h"
-#include "../common/malloc.h"
-#include "../common/showmsg.h"
+#define HERCULES_CORE
 
-#include "map.h" // struct map_session_data
 #include "storage.h"
-#include "chrif.h"
-#include "itemdb.h"
-#include "clif.h"
-#include "intif.h"
-#include "pc.h"
-#include "guild.h"
-#include "battle.h"
-#include "atcommand.h"
-#include "log.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "atcommand.h"
+#include "battle.h"
+#include "chrif.h"
+#include "clif.h"
+#include "guild.h"
+#include "intif.h"
+#include "itemdb.h"
+#include "log.h"
+#include "map.h" // struct map_session_data
+#include "pc.h"
+#include "../common/cbasetypes.h"
+#include "../common/db.h"
+#include "../common/malloc.h"
+#include "../common/nullpo.h"
 
 struct storage_interface storage_s;
 struct guild_storage_interface gstorage_s;
@@ -30,10 +31,10 @@ struct guild_storage_interface gstorage_s;
 /*==========================================
  * Sort items in the warehouse
  *------------------------------------------*/
-int storage_comp_item(const void *_i1, const void *_i2)
+int storage_comp_item(const void *i1_, const void *i2_)
 {
-	struct item *i1 = (struct item *)_i1;
-	struct item *i2 = (struct item *)_i2;
+	struct item *i1 = (struct item *)i1_;
+	struct item *i2 = (struct item *)i2_;
 
 	if (i1->nameid == i2->nameid)
 		return 0;
@@ -542,7 +543,7 @@ int storage_guild_storageadd(struct map_session_data* sd, int index, int amount)
 * @index : storage idx
 * return
 * 	0 : fail
-* 	1 : succes
+* 	1 : success
  *------------------------------------------*/
 int storage_guild_storageget(struct map_session_data* sd, int index, int amount)
 {
@@ -583,7 +584,7 @@ int storage_guild_storageget(struct map_session_data* sd, int index, int amount)
 * @index : cart inventory idx
 * return
 * 	0 : fail
-* 	1 : succes
+* 	1 : success
  *------------------------------------------*/
 int storage_guild_storageaddfromcart(struct map_session_data* sd, int index, int amount)
 {
@@ -615,7 +616,7 @@ int storage_guild_storageaddfromcart(struct map_session_data* sd, int index, int
 * @index : storage idx
 * return
 * 	0 : fail
-* 	1 : succes
+* 	1 : success
  *------------------------------------------*/
 int storage_guild_storagegettocart(struct map_session_data* sd, int index, int amount)
 {
@@ -646,7 +647,7 @@ int storage_guild_storagegettocart(struct map_session_data* sd, int index, int a
 * Request to save guild storage
 * return
 * 	0 : fail (no storage)
-* 	1 : succes
+* 	1 : success
  *------------------------------------------*/
 int storage_guild_storagesave(int account_id, int guild_id, int flag)
 {
@@ -667,7 +668,7 @@ int storage_guild_storagesave(int account_id, int guild_id, int flag)
 * ACK save of guild storage
 * return
 * 	0 : fail (no storage)
-* 	1 : succes
+* 	1 : success
  *------------------------------------------*/
 int storage_guild_storagesaved(int guild_id)
 {

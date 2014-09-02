@@ -2,22 +2,26 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#ifndef _MAP_SKILL_H_
-#define _MAP_SKILL_H_
+#ifndef MAP_SKILL_H
+#define MAP_SKILL_H
 
-#include "../common/mmo.h" // MAX_SKILL, struct square
-#include "../common/db.h"
+#include "../config/core.h" // RENEWAL_CAST
+
 #include "map.h" // struct block_list
+#include "status.h" // enum sc_type
+#include "../common/cbasetypes.h"
+#include "../common/db.h"
+#include "../common/mmo.h" // MAX_SKILL, struct square
 
 /**
  * Declarations
  **/
-struct map_session_data;
 struct homun_data;
+struct map_session_data;
+struct mercenary_data;
 struct skill_unit;
-struct skill_unit_group;
-struct status_change_entry;
 struct square;
+struct status_change_entry;
 
 /**
  * Defines
@@ -162,7 +166,7 @@ enum {
 
 enum e_skill {
 	NV_BASIC = 1,
-	
+
 	SM_SWORD,
 	SM_TWOHAND,
 	SM_RECOVERY,
@@ -170,7 +174,7 @@ enum e_skill {
 	SM_PROVOKE,
 	SM_MAGNUM,
 	SM_ENDURE,
-	
+
 	MG_SRECOVERY,
 	MG_SIGHT,
 	MG_NAPALMBEAT,
@@ -184,7 +188,7 @@ enum e_skill {
 	MG_FIREBOLT,
 	MG_LIGHTNINGBOLT,
 	MG_THUNDERSTORM,
-	
+
 	AL_DP,
 	AL_DEMONBANE,
 	AL_RUWACH,
@@ -199,7 +203,7 @@ enum e_skill {
 	AL_ANGELUS,
 	AL_BLESSING,
 	AL_CURE,
-	
+
 	MC_INCCARRY,
 	MC_DISCOUNT,
 	MC_OVERCHARGE,
@@ -207,22 +211,22 @@ enum e_skill {
 	MC_IDENTIFY,
 	MC_VENDING,
 	MC_MAMMONITE,
-	
+
 	AC_OWL,
 	AC_VULTURE,
 	AC_CONCENTRATION,
 	AC_DOUBLE,
 	AC_SHOWER,
-	
+
 	TF_DOUBLE,
 	TF_MISS,
 	TF_STEAL,
 	TF_HIDING,
 	TF_POISON,
 	TF_DETOXIFY,
-	
+
 	ALL_RESURRECTION,
-	
+
 	KN_SPEARMASTERY,
 	KN_PIERCE,
 	KN_BRANDISHSPEAR,
@@ -233,7 +237,7 @@ enum e_skill {
 	KN_BOWLINGBASH,
 	KN_RIDING,
 	KN_CAVALIERMASTERY,
-	
+
 	PR_MACEMASTERY,
 	PR_IMPOSITIO,
 	PR_SUFFRAGIUM,
@@ -249,7 +253,7 @@ enum e_skill {
 	PR_TURNUNDEAD,
 	PR_LEXAETERNA,
 	PR_MAGNUS,
-	
+
 	WZ_FIREPILLAR,
 	WZ_SIGHTRASHER,
 	WZ_FIREIVY,
@@ -264,7 +268,7 @@ enum e_skill {
 	WZ_HEAVENDRIVE,
 	WZ_QUAGMIRE,
 	WZ_ESTIMATION,
-	
+
 	BS_IRON,
 	BS_STEEL,
 	BS_ENCHANTEDSTONE,
@@ -286,7 +290,7 @@ enum e_skill {
 	BS_WEAPONPERFECT,
 	BS_OVERTHRUST,
 	BS_MAXIMIZE,
-	
+
 	HT_SKIDTRAP,
 	HT_LANDMINE,
 	HT_ANKLESNARE,
@@ -304,7 +308,7 @@ enum e_skill {
 	HT_BLITZBEAT,
 	HT_DETECTING,
 	HT_SPRINGTRAP,
-	
+
 	AS_RIGHT,
 	AS_LEFT,
 	AS_KATAR,
@@ -315,7 +319,7 @@ enum e_skill {
 	AS_POISONREACT,
 	AS_VENOMDUST,
 	AS_SPLASHER,
-	
+
 	NV_FIRSTAID,
 	NV_TRICKDEAD,
 	SM_MOVINGRECOVERY,
@@ -332,7 +336,7 @@ enum e_skill {
 	MC_LOUD,
 	AL_HOLYLIGHT,
 	MG_ENERGYCOAT,
-	
+
 	NPC_PIERCINGATT,
 	NPC_MENTALBREAKER,
 	NPC_RANGEATTACK,
@@ -385,7 +389,7 @@ enum e_skill {
 	NPC_HALLUCINATION,
 	NPC_REBIRTH,
 	NPC_SUMMONMONSTER,
-	
+
 	RG_SNATCHER,
 	RG_STEALCOIN,
 	RG_BACKSTAP,
@@ -402,7 +406,7 @@ enum e_skill {
 	RG_GANGSTER,
 	RG_COMPULSION,
 	RG_PLAGIARISM,
-	
+
 	AM_AXEMASTERY,
 	AM_LEARNINGPOTION,
 	AM_PHARMACY,
@@ -425,7 +429,7 @@ enum e_skill {
 	AM_DRILLMASTER,
 	AM_HEALHOMUN,
 	AM_RESURRECTHOMUN,
-	
+
 	CR_TRUST,
 	CR_AUTOGUARD,
 	CR_SHIELDCHARGE,
@@ -437,7 +441,7 @@ enum e_skill {
 	CR_PROVIDENCE,
 	CR_DEFENDER,
 	CR_SPEARQUICKEN,
-	
+
 	MO_IRONHAND,
 	MO_SPIRITSRECOVERY,
 	MO_CALLSPIRITS,
@@ -453,7 +457,7 @@ enum e_skill {
 	MO_EXTREMITYFIST,
 	MO_CHAINCOMBO,
 	MO_COMBOFINISH,
-	
+
 	SA_ADVANCEDBOOK,
 	SA_CASTCANCEL,
 	SA_MAGICROD,
@@ -484,7 +488,7 @@ enum e_skill {
 	SA_INSTANTDEATH,
 	SA_FULLRECOVERY,
 	SA_COMA,
-	
+
 	BD_ADAPTATION,
 	BD_ENCORE,
 	BD_LULLABY,
@@ -496,7 +500,7 @@ enum e_skill {
 	BD_INTOABYSS,
 	BD_SIEGFRIED,
 	BD_RAGNAROK,
-	
+
 	BA_MUSICALLESSON,
 	BA_MUSICALSTRIKE,
 	BA_DISSONANCE,
@@ -505,7 +509,7 @@ enum e_skill {
 	BA_ASSASSINCROSS,
 	BA_POEMBRAGI,
 	BA_APPLEIDUN,
-	
+
 	DC_DANCINGLESSON,
 	DC_THROWARROW,
 	DC_UGLYDANCE,
@@ -514,17 +518,17 @@ enum e_skill {
 	DC_DONTFORGETME,
 	DC_FORTUNEKISS,
 	DC_SERVICEFORYOU,
-	
+
 	NPC_RANDOMMOVE,
 	NPC_SPEEDUP,
 	NPC_REVENGE,
-	
+
 	WE_MALE,
 	WE_FEMALE,
 	WE_CALLPARTNER,
-	
+
 	ITM_TOMAHAWK,
-	
+
 	NPC_DARKCROSS,
 	NPC_GRANDDARKNESS,
 	NPC_DARKSTRIKE,
@@ -542,7 +546,7 @@ enum e_skill {
 	NPC_CALLSLAVE,
 	NPC_INVISIBLE,
 	NPC_RUN,
-	
+
 	LK_AURABLADE,
 	LK_PARRYING,
 	LK_CONCENTRATION,
@@ -596,10 +600,11 @@ enum e_skill {
 	PF_SPIDERWEB,
 	ASC_METEORASSAULT,
 	ASC_CDP,
+
 	WE_BABY,
 	WE_CALLPARENT,
 	WE_CALLBABY,
-	
+
 	TK_RUN,
 	TK_READYSTORM,
 	TK_STORMKICK,
@@ -616,7 +621,7 @@ enum e_skill {
 	TK_POWER,
 	TK_SEVENWIND,
 	TK_HIGHJUMP,
-	
+
 	SG_FEEL,
 	SG_SUN_WARM,
 	SG_MOON_WARM,
@@ -635,7 +640,7 @@ enum e_skill {
 	SG_FRIEND,
 	SG_KNOWLEDGE,
 	SG_FUSION,
-	
+
 	SL_ALCHEMIST,
 	AM_BERSERKPITCHER,
 	SL_MONK,
@@ -664,7 +669,7 @@ enum e_skill {
 	SL_SWOO,
 	SL_SKE,
 	SL_SKA,
-	
+
 	SM_SELFPROVOKE,
 	NPC_EMOTION_ON,
 	ST_PRESERVE,
@@ -692,7 +697,7 @@ enum e_skill {
 	AM_TWILIGHT2,
 	AM_TWILIGHT3,
 	HT_POWER,
-	
+
 	GS_GLITTERING,
 	GS_FLING,
 	GS_TRIPLEACTION,
@@ -715,7 +720,7 @@ enum e_skill {
 	GS_FULLBUSTER,
 	GS_SPREADATTACK,
 	GS_GROUNDDRIFT,
-	
+
 	NJ_TOBIDOUGU,
 	NJ_SYURIKEN,
 	NJ_KUNAI,
@@ -739,7 +744,7 @@ enum e_skill {
 	NJ_KAMAITACHI,
 	NJ_NEN,
 	NJ_ISSEN,
-	
+
 	MB_FIGHTING,
 	MB_NEUTRAL,
 	MB_TAIMING_PUTI,
@@ -767,7 +772,7 @@ enum e_skill {
 	MB_M_WALLCRASH,
 	MB_M_REINCARNATION,
 	MB_B_EQUIP,
-	
+
 	SL_DEATHKNIGHT,
 	SL_COLLECTOR,
 	SL_NINJA,
@@ -776,7 +781,7 @@ enum e_skill {
 	DA_RESET,
 	DE_BERSERKAIZER,
 	DA_DARKPOWER,
-	
+
 	DE_PASSIVE,
 	DE_PATTACK,
 	DE_PSPEED,
@@ -816,7 +821,7 @@ enum e_skill {
 	DE_TWINATTACK,
 	DE_WINDATTACK,
 	DE_WATERATTACK,
-	
+
 	DA_ENERGY,
 	DA_CLOUD,
 	DA_FIRSTSLOT,
@@ -851,7 +856,7 @@ enum e_skill {
 	ALL_TIMEIN,
 	DA_ZENYRANK,
 	DA_ACCESSORYMIX,
-	
+
 	NPC_EARTHQUAKE,
 	NPC_FIREBREATH,
 	NPC_ICEBREATH,
@@ -880,7 +885,6 @@ enum e_skill {
 	NPC_WIDESTUN,
 	NPC_VAMPIRE_GIFT,
 	NPC_WIDESOULDRAIN,
-	
 	ALL_INCCARRY,
 	NPC_TALK,
 	NPC_HELLPOWER,
@@ -909,6 +913,23 @@ enum e_skill {
 	NPC_VENOMFOG,
 	NPC_MILLENNIUMSHIELD,
 	NPC_COMET,
+// TODO: What PACKETVER are these skills added? [Panikon]
+// After this addition all skills from NPC_WIDEWEB to NPC_LEX_AETERNA
+// will have their IDs changed
+#if PACKETVER >= 20140205
+	NPC_ICEMINE,
+	NPC_ICEEXPLO,
+	NPC_FLAMECROSS,
+	NPC_PULSESTRIKE2,
+	NPC_DANCINGBLADE,
+	NPC_DANCINGBLADE_ATK,
+	NPC_DARKPIERCING,
+	NPC_MAXPAIN,
+	NPC_MAXPAIN_ATK,
+	NPC_DEATHSUMMON,
+	NPC_HELLBURNING,
+	NPC_JACKFROST,
+#endif
 	NPC_WIDEWEB,
 	NPC_WIDESUCK,
 	NPC_STORMGUST2,
@@ -936,7 +957,7 @@ enum e_skill {
 	SA_ELEMENTGROUND,
 	SA_ELEMENTFIRE,
 	SA_ELEMENTWIND,
-	
+
 	RK_ENCHANTBLADE = 2001,
 	RK_SONICWAVE,
 	RK_DEATHBOUND,
@@ -957,7 +978,7 @@ enum e_skill {
 	RK_FIGHTINGSPIRIT,
 	RK_ABUNDANCE,
 	RK_PHANTOMTHRUST,
-	
+
 	GC_VENOMIMPRESS,
 	GC_CROSSIMPACT,
 	GC_DARKILLUSION,
@@ -975,7 +996,7 @@ enum e_skill {
 	GC_HALLUCINATIONWALK,
 	GC_ROLLINGCUTTER,
 	GC_CROSSRIPPERSLASHER,
-	
+
 	AB_JUDEX,
 	AB_ANCILLA,
 	AB_ADORAMUS,
@@ -996,7 +1017,7 @@ enum e_skill {
 	AB_DUPLELIGHT_MELEE,
 	AB_DUPLELIGHT_MAGIC,
 	AB_SILENTIUM,
-	
+
 	WL_WHITEIMPRISON = 2201,
 	WL_SOULEXPANSION,
 	WL_FROSTMISTY,
@@ -1029,7 +1050,7 @@ enum e_skill {
 	WL_RELEASE,
 	WL_READING_SB,
 	WL_FREEZE_SP,
-	
+
 	RA_ARROWSTORM,
 	RA_FEARBREEZE,
 	RA_RANGERMAIN,
@@ -1052,7 +1073,7 @@ enum e_skill {
 	RA_VERDURETRAP,
 	RA_FIRINGTRAP,
 	RA_ICEBOUNDTRAP,
-	
+
 	NC_MADOLICENCE,
 	NC_BOOSTKNUCKLE,
 	NC_PILEBUNKER,
@@ -1082,7 +1103,7 @@ enum e_skill {
 	NC_SILVERSNIPER,
 	NC_MAGICDECOY,
 	NC_DISJOINT,
-	
+
 	SC_FATALMENACE,
 	SC_REPRODUCE,
 	SC_AUTOSHADOWSPELL,
@@ -1104,7 +1125,7 @@ enum e_skill {
 	SC_MAELSTROM,
 	SC_BLOODYLUST,
 	SC_FEINTBOMB,
-	
+
 	LG_CANNONSPEAR = 2307,
 	LG_BANISHINGPOINT,
 	LG_TRAMPLE,
@@ -1124,7 +1145,7 @@ enum e_skill {
 	LG_EARTHDRIVE,
 	LG_HESPERUSLIT,
 	LG_INSPIRATION,
-	
+
 	SR_DRAGONCOMBO,
 	SR_SKYNETBLOW,
 	SR_EARTHSHAKER,
@@ -1148,15 +1169,15 @@ enum e_skill {
 	SR_GENTLETOUCH_ENERGYGAIN,
 	SR_GENTLETOUCH_CHANGE,
 	SR_GENTLETOUCH_REVITALIZE,
-	
+
 	WA_SWING_DANCE = 2350,
 	WA_SYMPHONY_OF_LOVER,
 	WA_MOONLIT_SERENADE,
-	
+
 	MI_RUSH_WINDMILL = 2381,
 	MI_ECHOSONG,
 	MI_HARMONIZE,
-	
+
 	WM_LESSON = 2412,
 	WM_METALICSOUND,
 	WM_REVERBERATION,
@@ -1180,7 +1201,7 @@ enum e_skill {
 	WM_MELODYOFSINK,
 	WM_BEYOND_OF_WARCRY,
 	WM_UNLIMITED_HUMMING_VOICE,
-	
+
 	SO_FIREWALK = 2443,
 	SO_ELECTRICWALK,
 	SO_SPELLFIST,
@@ -1207,7 +1228,7 @@ enum e_skill {
 	SO_WATER_INSIGNIA,
 	SO_WIND_INSIGNIA,
 	SO_EARTH_INSIGNIA,
-	
+
 	GN_TRAINING_SWORD = 2474,
 	GN_REMODELING_CART,
 	GN_CART_TORNADO,
@@ -1233,14 +1254,14 @@ enum e_skill {
 	GN_MAKEBOMB,
 	GN_S_PHARMACY,
 	GN_SLINGITEM_RANGEMELEEATK,
-	
+
 	AB_SECRAMENT = 2515,
 	WM_SEVERE_RAINSTORM_MELEE,
 	SR_HOWLINGOFLION,
 	SR_RIDEINLIGHTNING,
 	LG_OVERBRAND_BRANDISH,
 	LG_OVERBRAND_PLUSATK,
-	
+
 	ALL_ODINS_RECALL = 2533,
 	RETURN_TO_ELDICASTES,
 	ALL_BUYING_STORE,
@@ -1253,7 +1274,12 @@ enum e_skill {
 	ALL_TETANY,
 	ALL_RAY_OF_PROTECTION,
 	MC_CARTDECORATE,
-	
+	GM_ITEM_ATKMAX,
+	GM_ITEM_ATKMIN,
+	GM_ITEM_MATKMAX,
+	GM_ITEM_MATKMIN,
+	ALL_LIGHTGUARD,
+
 	RL_GLITTERING_GREED = 2551,
 	RL_RICHS_COIN,
 	RL_MASS_SPIRAL,
@@ -1278,7 +1304,7 @@ enum e_skill {
 	RL_R_TRIP_PLUSATK,
 	RL_B_FLICKER_ATK,
 	RL_GLITTERING_GREED_ATK,
-	
+
 	KO_YAMIKUMO = 3001,
 	KO_RIGHT,
 	KO_LEFT,
@@ -1308,12 +1334,17 @@ enum e_skill {
 	OB_OBOROGENSOU,
 	OB_OBOROGENSOU_TRANSITION_ATK,
 	OB_AKAITSUKI,
-	
+
 	ECL_SNOWFLIP = 3031,
 	ECL_PEONYMAMY,
 	ECL_SADAGUI,
 	ECL_SEQUOIADUST,
 	ECLAGE_RECALL,
+	BA_POEMBRAGI2,
+	DC_FORTUNEKISS2,
+	ITEM_OPTION_SPLASH_ATTACK,
+	GM_FORCE_TRANSFER,
+	GM_WIDE_RESURRECTION,
 
 	GC_DARKCROW = 5001,
 	RA_UNLIMIT,
@@ -1329,10 +1360,7 @@ enum e_skill {
 	WL_TELEKINESIS_INTENSE,
 	LG_KINGS_GRACE,
 	ALL_FULL_THROTTLE,
-	SR_FLASHCOMBO_ATK_STEP1,
-	SR_FLASHCOMBO_ATK_STEP2,
-	SR_FLASHCOMBO_ATK_STEP3,
-	SR_FLASHCOMBO_ATK_STEP4,
+	NC_MAGMA_ERUPTION_DOTDAMAGE,
 
 	HLIF_HEAL = 8001,
 	HLIF_AVOID,
@@ -1377,7 +1405,7 @@ enum e_skill {
 	MH_LAVA_SLIDE,
 	MH_PYROCLASTIC,
 	MH_VOLCANIC_ASH,
-	
+
 	MS_BASH = 8201,
 	MS_MAGNUM,
 	MS_BOWLINGBASH,
@@ -1418,7 +1446,8 @@ enum e_skill {
 	MER_KYRIE,
 	MER_BLESSING,
 	MER_INCAGI,
-	
+	MER_INVINCIBLEOFF2,
+
 	EL_CIRCLE_OF_FIRE = 8401,
 	EL_FIRE_CLOAK,
 	EL_FIRE_MANTLE,
@@ -1593,7 +1622,7 @@ enum {
 	UNT_ZENKAI_WIND,
 	UNT_MAKIBISHI,
 	UNT_VENOMFOG,
-	UNT_ICEMINE, 
+	UNT_ICEMINE,
  	UNT_FLAMECROSS,
  	UNT_HELLBURNING,
  	UNT_MAGMA_ERUPTION,
@@ -1796,6 +1825,7 @@ struct skill_interface {
 	DBMap* unit_db; // int id -> struct skill_unit*
 	DBMap* usave_db; // char_id -> struct skill_unit_save
 	DBMap* group_db;// int group_id -> struct skill_unit_group*
+	DBMap* bowling_db;// int mob_id -> struct mob_data*s
 	/* */
 	struct eri *unit_ers; //For handling skill_unit's [Skotlex]
 	struct eri *timer_ers; //For handling skill_timerskills [Skotlex]
@@ -1914,6 +1944,8 @@ struct skill_interface {
 	int (*autospell) (struct map_session_data *md,uint16 skill_id);
 	int (*calc_heal) (struct block_list *src, struct block_list *target, uint16 skill_id, uint16 skill_lv, bool heal);
 	bool (*check_cloaking) (struct block_list *bl, struct status_change_entry *sce);
+	int (*check_cloaking_end) (struct block_list *bl, va_list ap);
+	bool (*can_cloak) (struct map_session_data *sd);
 	int (*enchant_elemental_end) (struct block_list *bl, int type);
 	int (*not_ok) (uint16 skill_id, struct map_session_data *sd);
 	int (*not_ok_hom) (uint16 skill_id, struct homun_data *hd);
@@ -2015,4 +2047,4 @@ struct skill_interface *skill;
 
 void skill_defaults(void);
 
-#endif /* _MAP_SKILL_H_ */
+#endif /* MAP_SKILL_H */

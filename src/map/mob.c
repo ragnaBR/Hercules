@@ -2,46 +2,49 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#include "../common/cbasetypes.h"
-#include "../common/timer.h"
-#include "../common/db.h"
-#include "../common/nullpo.h"
-#include "../common/malloc.h"
-#include "../common/showmsg.h"
-#include "../common/ers.h"
-#include "../common/random.h"
-#include "../common/strlib.h"
-#include "../common/utils.h"
-#include "../common/socket.h"
+#define HERCULES_CORE
 
-#include "map.h"
-#include "path.h"
-#include "clif.h"
-#include "intif.h"
-#include "pc.h"
-#include "pet.h"
-#include "status.h"
+#include "../config/core.h" // AUTOLOOT_DISTANCE, DBPATH, DEFTYPE_MAX, DEFTYPE_MIN, RENEWAL_DROP, RENEWAL_EXP
 #include "mob.h"
-#include "homunculus.h"
-#include "mercenary.h"
-#include "elemental.h"
-#include "guild.h"
-#include "itemdb.h"
-#include "skill.h"
-#include "battle.h"
-#include "party.h"
-#include "npc.h"
-#include "log.h"
-#include "script.h"
-#include "atcommand.h"
-#include "date.h"
-#include "quest.h"
 
+#include <math.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
-#include <math.h>
+
+#include "atcommand.h"
+#include "battle.h"
+#include "clif.h"
+#include "date.h"
+#include "elemental.h"
+#include "guild.h"
+#include "homunculus.h"
+#include "intif.h"
+#include "itemdb.h"
+#include "log.h"
+#include "map.h"
+#include "mercenary.h"
+#include "npc.h"
+#include "party.h"
+#include "path.h"
+#include "pc.h"
+#include "pet.h"
+#include "quest.h"
+#include "script.h"
+#include "skill.h"
+#include "status.h"
+#include "../common/cbasetypes.h"
+#include "../common/db.h"
+#include "../common/ers.h"
+#include "../common/malloc.h"
+#include "../common/nullpo.h"
+#include "../common/random.h"
+#include "../common/showmsg.h"
+#include "../common/socket.h"
+#include "../common/strlib.h"
+#include "../common/timer.h"
+#include "../common/utils.h"
 
 struct mob_interface mob_s;
 
@@ -353,7 +356,7 @@ bool mob_ksprotected(struct block_list *src, struct block_list *target) {
 		return false; // KS Protection Disabled
 
 	if( !(md = BL_CAST(BL_MOB,target)) )
-		return false; // Tarjet is not MOB
+		return false; // Target is not MOB
 
 	if( (s_bl = battle->get_master(src)) == NULL )
 		s_bl = src;
@@ -484,20 +487,17 @@ int mob_once_spawn(struct map_session_data* sd, int16 m, int16 x, int16 y, const
 		if (!md)
 			continue;
 
-		if (class_ == MOBID_EMPERIUM && !no_guardian_data) {
+		if ( class_ == MOBID_EMPERIUM && !no_guardian_data ) {
 			struct guild_castle* gc = guild->mapindex2gc(map_id2index(m));
 			struct guild* g = (gc) ? guild->search(gc->guild_id) : NULL;
-			if (gc) {
+			if( gc ) {
 				md->guardian_data = (struct guardian_data*)aCalloc(1, sizeof(struct guardian_data));
 				md->guardian_data->castle = gc;
 				md->guardian_data->number = MAX_GUARDIANS;
-				md->guardian_data->guild_id = gc->guild_id;
-				if (g) {
-					md->guardian_data->emblem_id = g->emblem_id;
-					memcpy(md->guardian_data->guild_name, g->name, NAME_LENGTH);
-				}
-				else if (gc->guild_id) //Guild not yet available, retry in 5.
-					timer->add(timer->gettick()+5000,mob->spawn_guardian_sub,md->bl.id,md->guardian_data->guild_id);
+				if( g )
+					md->guardian_data->g = g;
+				else if( gc->guild_id ) //Guild not yet available, retry in 5.
+					timer->add(timer->gettick()+5000,mob->spawn_guardian_sub,md->bl.id,gc->guild_id);
 			}
 		}	// end addition [Valaris]
 
@@ -567,21 +567,23 @@ int mob_once_spawn_area(struct map_session_data* sd, int16 m, int16 x0, int16 y0
 
 	return id; // id of last spawned mob
 }
-/*==========================================
- * Set a Guardian's guild data [Skotlex]
- *------------------------------------------*/
+
+/**
+ * Sets a guardian's guild data and liberates castle if couldn't retrieve guild data
+ * @param data (int)guild_id
+ * @retval Always 0
+ * @author Skotlex
+ **/
 int mob_spawn_guardian_sub(int tid, int64 tick, int id, intptr_t data) {
-	//Needed because the guild_data may not be available at guardian spawn time.
+	//Needed because the guild data may not be available at guardian spawn time.
 	struct block_list* bl = map->id2bl(id);
 	struct mob_data* md;
 	struct guild* g;
-	int guardup_lv;
 
-	if (bl == NULL) //It is possible mob was already removed from map when the castle has no owner. [Skotlex]
+	if( bl == NULL ) //It is possible mob was already removed from map when the castle has no owner. [Skotlex]
 		return 0;
 
-	if (bl->type != BL_MOB)
-	{
+	if( bl->type != BL_MOB ) {
 		ShowError("mob_spawn_guardian_sub: Block error!\n");
 		return 0;
 	}
@@ -590,30 +592,28 @@ int mob_spawn_guardian_sub(int tid, int64 tick, int id, intptr_t data) {
 	nullpo_ret(md->guardian_data);
 	g = guild->search((int)data);
 
-	if (g == NULL)
-	{	//Liberate castle, if the guild is not found this is an error! [Skotlex]
+	if( g == NULL ) { //Liberate castle, if the guild is not found this is an error! [Skotlex]
 		ShowError("mob_spawn_guardian_sub: Couldn't load guild %d!\n", (int)data);
-		if (md->class_ == MOBID_EMPERIUM && md->guardian_data)
-		{	//Not sure this is the best way, but otherwise we'd be invoking this for ALL guardians spawned later on.
-			md->guardian_data->guild_id = 0;
-			if (md->guardian_data->castle->guild_id) //Free castle up.
-			{
+		//Not sure this is the best way, but otherwise we'd be invoking this for ALL guardians spawned later on.
+		if( md->class_ == MOBID_EMPERIUM && md->guardian_data ) {
+			md->guardian_data->g = NULL;
+			if( md->guardian_data->castle->guild_id ) {//Free castle up.
 				ShowNotice("Clearing ownership of castle %d (%s)\n", md->guardian_data->castle->castle_id, md->guardian_data->castle->castle_name);
 				guild->castledatasave(md->guardian_data->castle->castle_id, 1, 0);
 			}
 		} else {
-			if (md->guardian_data && md->guardian_data->number >= 0 && md->guardian_data->number < MAX_GUARDIANS && md->guardian_data->castle->guardian[md->guardian_data->number].visible)
+			if( md->guardian_data && md->guardian_data->number >= 0 && md->guardian_data->number < MAX_GUARDIANS
+				&& md->guardian_data->castle->guardian[md->guardian_data->number].visible )
 				guild->castledatasave(md->guardian_data->castle->castle_id, 10+md->guardian_data->number,0);
-			unit->free(&md->bl,CLR_OUTSIGHT); //Remove guardian.
+
+			unit->free(&md->bl,CLR_OUTSIGHT); // Remove guardian.
 		}
 		return 0;
 	}
-	guardup_lv = guild->checkskill(g,GD_GUARDUP);
-	md->guardian_data->emblem_id = g->emblem_id;
-	memcpy(md->guardian_data->guild_name, g->name, NAME_LENGTH);
-	md->guardian_data->guardup_lv = guardup_lv;
-	if( guardup_lv )
-		status_calc_mob(md, SCO_NONE); //Give bonuses.
+
+	if( guild->checkskill(g,GD_GUARDUP) )
+		status_calc_mob(md, SCO_NONE); // Give bonuses.
+
 	return 0;
 }
 
@@ -689,7 +689,6 @@ int mob_spawn_guardian(const char* mapname, short x, short y, const char* mobnam
 	md = mob->spawn_dataset(&data);
 	md->guardian_data = (struct guardian_data*)aCalloc(1, sizeof(struct guardian_data));
 	md->guardian_data->number = guardian;
-	md->guardian_data->guild_id = gc->guild_id;
 	md->guardian_data->castle = gc;
 	if( has_index )
 	{// permanent guardian
@@ -706,13 +705,10 @@ int mob_spawn_guardian(const char* mapname, short x, short y, const char* mobnam
 		}
 		gc->temp_guardians[i] = md->bl.id;
 	}
-	if (g)
-	{
-		md->guardian_data->emblem_id = g->emblem_id;
-		memcpy (md->guardian_data->guild_name, g->name, NAME_LENGTH);
-		md->guardian_data->guardup_lv = guild->checkskill(g,GD_GUARDUP);
-	} else if (md->guardian_data->guild_id)
-		timer->add(timer->gettick()+5000,mob->spawn_guardian_sub,md->bl.id,md->guardian_data->guild_id);
+	if( g )
+		md->guardian_data->g = g;
+	else if( gc->guild_id )
+		timer->add(timer->gettick()+5000,mob->spawn_guardian_sub,md->bl.id,gc->guild_id);
 	mob->spawn(md);
 
 	return md->bl.id;
@@ -1070,7 +1066,7 @@ int mob_ai_sub_hard_activesearch(struct block_list *bl,va_list ap)
 		default:
 			if (battle_config.hom_setting&0x4 &&
 				(*target) && (*target)->type == BL_HOM && bl->type != BL_HOM)
-				return 0; //For some reason Homun targets are never overriden.
+				return 0; //For some reason Homun targets are never overridden.
 
 			dist = distance_bl(&md->bl, bl);
 			if(
@@ -1440,7 +1436,7 @@ bool mob_ai_sub_hard(struct mob_data *md, int64 tick) {
 			//Unlock current target.
 			if (mob->warpchase(md, tbl))
 				return true; //Chasing this target.
-			mob->unlocktarget(md, tick-(battle_config.mob_ai&0x8?3000:0)); //Imediately do random walk.
+			mob->unlocktarget(md, tick-(battle_config.mob_ai&0x8?3000:0)); //Immediately do random walk.
 			tbl = NULL;
 		}
 	}
@@ -1617,7 +1613,19 @@ bool mob_ai_sub_hard(struct mob_data *md, int64 tick) {
 
 		if(tbl->type == BL_PC)
 			mob->log_damage(md, tbl, 0); //Log interaction (counts as 'attacker' for the exp bonus)
-		unit->attack(&md->bl,tbl->id,1);
+
+		if(!(mode&MD_RANDOMTARGET))
+			unit->attack(&md->bl,tbl->id,1);
+		else { // Attack once and find new random target
+			int search_size = (view_range < md->status.rhw.range) ? view_range : md->status.rhw.range;
+			unit->attack(&md->bl,tbl->id,0);
+			tbl = battle->get_enemy(&md->bl, DEFAULT_ENEMY_TYPE(md), search_size);
+			// If no target was found, keep atacking the old one
+			if( tbl ) {
+				md->target_id = tbl->id;
+				md->min_chase = md->db->range3;
+			}
+		}
 		return true;
 	}
 
@@ -2072,7 +2080,7 @@ int mob_dead(struct mob_data *md, struct block_list *src, int type) {
 		unsigned int base_exp,job_exp;
 	} pt[DAMAGELOG_SIZE];
 	int i, temp, count, m = md->bl.m, pnum = 0;
-	int dmgbltypes = 0;  // bitfield of all bl types, that caused damage to the mob and are elligible for exp distribution
+	int dmgbltypes = 0;  // bitfield of all bl types, that caused damage to the mob and are eligible for exp distribution
 	unsigned int mvp_damage;
 	int64 tick = timer->gettick();
 	bool rebirth, homkillonly;
@@ -2290,7 +2298,7 @@ int mob_dead(struct mob_data *md, struct block_list *src, int type) {
 		int drop_modifier = mvp_sd    ? pc->level_penalty_mod( md->level - mvp_sd->status.base_level, md->status.race, md->status.mode, 2)   :
 							second_sd ? pc->level_penalty_mod( md->level - second_sd->status.base_level, md->status.race, md->status.mode, 2):
 							third_sd  ? pc->level_penalty_mod( md->level - third_sd->status.base_level, md->status.race, md->status.mode, 2) :
-							100;/* no player was attached, we dont use any modifier (100 = rates are not touched) */
+							100;/* no player was attached, we don't use any modifier (100 = rates are not touched) */
 #endif
 		dlist->m = md->bl.m;
 		dlist->x = md->bl.x;
@@ -2601,7 +2609,7 @@ int mob_dead(struct mob_data *md, struct block_list *src, int type) {
 	if( !rebirth ) {
 
 		if( pcdb_checkid(md->vd->class_) ) {//Player mobs are not removed automatically by the client.
-			/* first we set them dead, then we delay the outsight effect */
+			/* first we set them dead, then we delay the out sight effect */
 			clif->clearunit_area(&md->bl,CLR_DEAD);
 			clif->clearunit_delayed(&md->bl, CLR_OUTSIGHT,tick+3000);
 		} else
@@ -2654,14 +2662,11 @@ int mob_guardian_guildchange(struct mob_data *md)
 	if (!md->guardian_data)
 		return 0;
 
-	if (md->guardian_data->castle->guild_id == 0)
+	if( md->guardian_data->castle->guild_id == 0 )
 	{	//Castle with no owner? Delete the guardians.
-		if (md->class_ == MOBID_EMPERIUM)
-		{	//But don't delete the emperium, just clear it's guild-data
-			md->guardian_data->guild_id = 0;
-			md->guardian_data->emblem_id = 0;
-			md->guardian_data->guild_name[0] = '\0';
-		} else {
+		if( md->class_ == MOBID_EMPERIUM ) //But don't delete the emperium, just clear it's guild-data
+			md->guardian_data->g = NULL;
+		else {
 			if (md->guardian_data->number >= 0 && md->guardian_data->number < MAX_GUARDIANS && md->guardian_data->castle->guardian[md->guardian_data->number].visible)
 				guild->castledatasave(md->guardian_data->castle->castle_id, 10+md->guardian_data->number, 0);
 			unit->free(&md->bl,CLR_OUTSIGHT); //Remove guardian.
@@ -2670,19 +2675,16 @@ int mob_guardian_guildchange(struct mob_data *md)
 	}
 
 	g = guild->search(md->guardian_data->castle->guild_id);
-	if (g == NULL)
+	if( g == NULL )
 	{	//Properly remove guardian info from Castle data.
-		ShowError("mob_guardian_guildchange: New Guild (id %d) does not exists!\n", md->guardian_data->guild_id);
+		ShowError("mob_guardian_guildchange: New Guild (id %d) does not exists!\n", md->guardian_data->castle->guild_id);
 		if (md->guardian_data->number >= 0 && md->guardian_data->number < MAX_GUARDIANS)
 			guild->castledatasave(md->guardian_data->castle->castle_id, 10+md->guardian_data->number, 0);
 		unit->free(&md->bl,CLR_OUTSIGHT);
 		return 0;
 	}
 
-	md->guardian_data->guild_id = g->guild_id;
-	md->guardian_data->emblem_id = g->emblem_id;
-	md->guardian_data->guardup_lv = guild->checkskill(g,GD_GUARDUP);
-	memcpy(md->guardian_data->guild_name, g->name, NAME_LENGTH);
+	md->guardian_data->g = g;
 
 	return 1;
 }
@@ -2830,7 +2832,7 @@ int mob_warpslave(struct block_list *bl, int range) {
 }
 
 /*==========================================
- *  Counts slave sub, curently checking if mob master is the given ID.
+ *  Counts slave sub, currently checking if mob master is the given ID.
  *------------------------------------------*/
 int mob_countslave_sub(struct block_list *bl,va_list ap)
 {
@@ -3070,6 +3072,7 @@ int mobskill_use(struct mob_data *md, int64 tick, int event) {
 	struct block_list *bl;
 	struct mob_data *fmd = NULL;
 	int i,j,n;
+	short skill_target;
 
 	nullpo_ret(md);
 	nullpo_ret(ms = md->db->skill);
@@ -3168,10 +3171,12 @@ int mobskill_use(struct mob_data *md, int64 tick, int event) {
 		if (!flag)
 			continue; //Skill requisite failed to be fulfilled.
 
+
 		//Execute skill
+		skill_target = (md->db->status.mode&MD_RANDOMTARGET)? MST_RANDOM : ms[i].target;
 		if (skill->get_casttype(ms[i].skill_id) == CAST_GROUND) {//Ground skill.
 			short x, y;
-			switch (ms[i].target) {
+			switch (skill_target) {
 				case MST_RANDOM: //Pick a random enemy within skill range.
 					bl = battle->get_enemy(&md->bl, DEFAULT_ENEMY_TYPE(md),
 						skill->get_range2(&md->bl, ms[i].skill_id, ms[i].skill_lv));
@@ -3201,10 +3206,10 @@ int mobskill_use(struct mob_data *md, int64 tick, int event) {
 			x = bl->x;
 		  	y = bl->y;
 			// Look for an area to cast the spell around...
-			if (ms[i].target >= MST_AROUND1 || ms[i].target >= MST_AROUND5) {
-				j = ms[i].target >= MST_AROUND1?
-					(ms[i].target-MST_AROUND1) +1:
-					(ms[i].target-MST_AROUND5) +1;
+			if (skill_target >= MST_AROUND1 || skill_target >= MST_AROUND5) {
+				j = skill_target >= MST_AROUND1?
+					(skill_target-MST_AROUND1) +1:
+					(skill_target-MST_AROUND5) +1;
 				map->search_freecell(&md->bl, md->bl.m, &x, &y, j, j, 3);
 			}
 			md->skill_idx = i;
@@ -3216,8 +3221,8 @@ int mobskill_use(struct mob_data *md, int64 tick, int event) {
 				continue;
 			}
 		} else {
-			//Targetted skill
-			switch (ms[i].target) {
+			//Targeted skill
+			switch (skill_target) {
 				case MST_RANDOM: //Pick a random enemy within skill range.
 					bl = battle->get_enemy(&md->bl, DEFAULT_ENEMY_TYPE(md),
 						skill->get_range2(&md->bl, ms[i].skill_id, ms[i].skill_lv));
@@ -3320,7 +3325,7 @@ int mob_is_clone(int class_)
 }
 
 //Flag values:
-//&1: Set special ai (fight mobs, not players)
+//&1: Set special AI (fight mobs, not players)
 //If mode is not passed, a default aggressive mode is used.
 //If master_id is passed, clone is attached to him.
 //Returns: ID of newly crafted copy.
@@ -3606,7 +3611,7 @@ unsigned int mob_drop_adjust(int baserate, int rate_adjust, unsigned short rate_
 }
 
 /**
- * Check if global item drop rate is overriden for given item
+ * Check if global item drop rate is overridden for given item
  * in db/mob_item_ratio.txt
  * @param nameid ID of the item
  * @param mob_id ID of the monster
@@ -3758,7 +3763,7 @@ bool mob_parse_dbrow(char** str) {
 	status->calc_misc(&data.bl, mstatus, db->lv);
 
 	// MVP EXP Bonus: MEXP
-	// Some new MVP's MEXP multipled by high exp-rate cause overflow. [LuzZza]
+	// Some new MVP's MEXP multiple by high exp-rate cause overflow. [LuzZza]
 	exp = (double)atoi(str[30]) * (double)battle_config.mvp_exp_rate / 100.;
 	db->mexp = (unsigned int)cap_value(exp, 0, UINT_MAX);
 
@@ -3820,7 +3825,7 @@ bool mob_parse_dbrow(char** str) {
 			ratemax = battle_config.item_drop_treasure_max;
 		}
 		else switch (type)
-		{ // Added suport to restrict normal drops of MVP's [Reddozen]
+		{ // Added support to restrict normal drops of MVP's [Reddozen]
 		case IT_HEALING:
 			rate_adjust = (mstatus->mode&MD_BOSS) ? battle_config.item_rate_heal_boss : battle_config.item_rate_heal;
 			ratemin = battle_config.item_drop_heal_min;
@@ -3877,7 +3882,7 @@ bool mob_parse_dbrow(char** str) {
 		mob->db_data[class_] = (struct mob_db*)aMalloc(sizeof(struct mob_db));
 	else
 		//Copy over spawn data
-		memcpy(&db->spawn, mob->db_data[class_]->spawn, sizeof(db->spawn));		
+		memcpy(&db->spawn, mob->db_data[class_]->spawn, sizeof(db->spawn));
 
 	memcpy(mob->db_data[class_], db, sizeof(struct mob_db));
 	return true;
@@ -3955,7 +3960,7 @@ int mob_read_sqldb(void) {
 		// free the query result
 		SQL->FreeResult(map->mysql_handle);
 
-		ShowStatus("Done reading '"CL_WHITE"%lu"CL_RESET"' entries in '"CL_WHITE"%s"CL_RESET"'.\n", count, mob_db_name[fi]);
+		ShowStatus("Done reading '"CL_WHITE"%"PRIu32""CL_RESET"' entries in '"CL_WHITE"%s"CL_RESET"'.\n", count, mob_db_name[fi]);
 	}
 	mob->name_constants();
 	return 0;
@@ -4077,7 +4082,7 @@ int mob_read_randommonster(void)
 			summon[i].qty = 1;
 		}
 		fclose(fp);
-		ShowStatus("Done reading '"CL_WHITE"%lu"CL_RESET"' entries in '"CL_WHITE"%s"CL_RESET"'.\n",count,mobfile[i]);
+		ShowStatus("Done reading '"CL_WHITE"%u"CL_RESET"' entries in '"CL_WHITE"%s"CL_RESET"'.\n",count,mobfile[i]);
 	}
 	return 0;
 }
@@ -4191,7 +4196,7 @@ void mob_readchatdb(void) {
 		count++;
 	}
 	fclose(fp);
-	ShowStatus("Done reading '"CL_WHITE"%lu"CL_RESET"' entries in '"CL_WHITE"%s"CL_RESET"'.\n", count, arc);
+	ShowStatus("Done reading '"CL_WHITE"%"PRIu32""CL_RESET"' entries in '"CL_WHITE"%s"CL_RESET"'.\n", count, arc);
 }
 
 /*==========================================
@@ -4527,7 +4532,7 @@ int mob_read_sqlskilldb(void) {
 		// free the query result
 		SQL->FreeResult(map->mysql_handle);
 
-		ShowStatus("Done reading '"CL_WHITE"%lu"CL_RESET"' entries in '"CL_WHITE"%s"CL_RESET"'.\n", count, mob_skill_db_name[fi]);
+		ShowStatus("Done reading '"CL_WHITE"%"PRIu32""CL_RESET"' entries in '"CL_WHITE"%s"CL_RESET"'.\n", count, mob_skill_db_name[fi]);
 	}
 	return 0;
 }

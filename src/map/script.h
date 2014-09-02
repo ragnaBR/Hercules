@@ -2,20 +2,22 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#ifndef _MAP_SCRIPT_H_
-#define _MAP_SCRIPT_H_
+#ifndef MAP_SCRIPT_H
+#define MAP_SCRIPT_H
 
-#include "../common/strlib.h" //StringBuf
-#include "../common/cbasetypes.h"
-#include "map.h" //EVENT_NAME_LENGTH
-
-#include <setjmp.h>
 #include <errno.h>
+#include <setjmp.h>
+
+#include "map.h" //EVENT_NAME_LENGTH
+#include "../common/cbasetypes.h"
+#include "../common/db.h"
+#include "../common/mmo.h" // struct item
+#include "../common/sql.h" // Sql
+#include "../common/strlib.h" //StringBuf
 
 /**
  * Declarations
  **/
-struct map_session_data;
 struct eri;
 
 /**
@@ -564,7 +566,7 @@ struct script_interface {
 	void (*final) (void);
 	int  (*reload) (void);
 	/* parse */
-	struct script_code* (*parse) (const char* src,const char* file,int line,int options);
+	struct script_code* (*parse) (const char* src,const char* file,int line,int options, int *retval);
 	bool (*add_builtin) (const struct script_function *buildin, bool override);
 	void (*parse_builtin) (void);
 	const char* (*parse_subexpr) (const char* p,int limit);
@@ -713,4 +715,4 @@ struct script_interface *script;
 
 void script_defaults(void);
 
-#endif /* _MAP_SCRIPT_H_ */
+#endif /* MAP_SCRIPT_H */

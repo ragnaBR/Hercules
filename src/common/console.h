@@ -1,14 +1,16 @@
 // Copyright (c) Hercules Dev Team, licensed under GNU GPL.
 // See the LICENSE file
 
-#ifndef _COMMON_CONSOLE_H_
-#define _COMMON_CONSOLE_H_
+#ifndef COMMON_CONSOLE_H
+#define COMMON_CONSOLE_H
 
-#include "../common/thread.h"
+#include "../config/core.h" // MAX_CONSOLE_INPUT
+
+#include "../common/cbasetypes.h"
 #include "../common/mutex.h"
 #include "../common/spinlock.h"
 #include "../common/sql.h"
-#include "../config/core.h"
+#include "../common/thread.h"
 
 /**
  * Queue Max
@@ -47,17 +49,14 @@ struct {
 	unsigned short count;
 } cinput;
 
-struct console_interface {
-	void (*init) (void);
-	void (*final) (void);
-	void (*display_title) (void);
 #ifdef CONSOLE_INPUT
+struct console_input_interface {
 	/* vars */
 	SPIN_LOCK ptlock;/* parse thread lock */
-	rAthread pthread;/* parse thread */
+	rAthread *pthread;/* parse thread */
 	volatile int32 ptstate;/* parse thread state */
-	ramutex ptmutex;/* parse thread mutex */
-	racond ptcond;/* parse thread cond */
+	ramutex *ptmutex;/* parse thread mutex */
+	racond *ptcond;/* parse thread cond */
 	/* */
 	struct CParseEntry **cmd_list;
 	struct CParseEntry **cmds;
@@ -77,11 +76,21 @@ struct console_interface {
 	void (*parse_list_subs) (struct CParseEntry *cmd, unsigned char depth);
 	void (*addCommand) (char *name, CParseFunc func);
 	void (*setSQL) (Sql *SQL_handle);
+};
+#else
+struct console_input_interface;
 #endif
+
+struct console_interface {
+	void (*init) (void);
+	void (*final) (void);
+	void (*display_title) (void);
+
+	struct console_input_interface *input;
 };
 
 struct console_interface *console;
 
 void console_defaults(void);
 
-#endif /* _COMMON_CONSOLE_H_ */
+#endif /* COMMON_CONSOLE_H */

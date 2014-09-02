@@ -2,22 +2,24 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#include "../common/mmo.h"
-#include "../common/db.h"
-#include "../common/malloc.h"
-#include "../common/showmsg.h"
-#include "../common/socket.h"
-#include "../common/strlib.h"
-#include "../common/sql.h"
-#include "../common/timer.h"
+#define HERCULES_CORE
 
-#include "char.h"
-#include "inter.h"
 #include "int_quest.h"
 
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
+
+#include "char.h"
+#include "inter.h"
+#include "../common/db.h"
+#include "../common/malloc.h"
+#include "../common/mmo.h"
+#include "../common/showmsg.h"
+#include "../common/socket.h"
+#include "../common/sql.h"
+#include "../common/strlib.h"
+#include "../common/timer.h"
 
 /**
  * Loads the entire questlog for a character.
@@ -195,7 +197,7 @@ int mapif_parse_quest_save(int fd) {
 		if (j < old_n) {
 			// Update existing quests
 
-			// Only states and counts are changable.
+			// Only states and counts are changeable.
 			ARR_FIND( 0, MAX_QUEST_OBJECTIVES, k, new_qd[i].count[k] != old_qd[j].count[k] );
 			if (k != MAX_QUEST_OBJECTIVES || new_qd[i].state != old_qd[j].state)
 				success &= mapif_quest_update(char_id, new_qd[i]);

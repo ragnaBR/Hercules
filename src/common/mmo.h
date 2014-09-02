@@ -2,12 +2,13 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#ifndef _COMMON_MMO_H_
-#define _COMMON_MMO_H_
+#ifndef COMMON_MMO_H
+#define COMMON_MMO_H
 
-#include "cbasetypes.h"
-#include "../common/db.h"
 #include <time.h>
+
+#include "../common/cbasetypes.h"
+#include "../common/db.h"
 
 // server->client protocol version
 //        0 - pre-?
@@ -25,7 +26,7 @@
 // 20071106 - 2007-11-06aSakexe+   - 0x78, 0x7c, 0x22c
 // 20080102 - 2008-01-02aSakexe+   - 0x2ec, 0x2ed , 0x2ee
 // 20081126 - 2008-11-26aSakexe+   - 0x1a2
-// 20090408 - 2009-04-08aSakexe+   - 0x44a (dont use as it overlaps with RE client packets)
+// 20090408 - 2009-04-08aSakexe+   - 0x44a (don't use as it overlaps with RE client packets)
 // 20080827 - 2008-08-27aRagexeRE+ - First RE Client
 // 20081217 - 2008-12-17aRagexeRE+ - 0x6d (Note: This one still use old Char Info Packet Structure)
 // 20081218 - 2008-12-17bRagexeRE+ - 0x6d (Note: From this one client use new Char Info Packet Structure)
@@ -83,6 +84,14 @@
 #endif // 20090603
 #endif // 20070227
 
+/* Feb 1st 2012 */
+#if PACKETVER >= 20120201
+#	define NEW_CARTS
+#	define MAX_CARTS 9
+#else
+#	define MAX_CARTS 5
+#endif
+
 #define MAX_INVENTORY 100
 //Max number of characters per account. Note that changing this setting alone is not enough if the client is not hexed to support more characters as well.
 #define MAX_CHARS 9
@@ -96,13 +105,13 @@
 //Official Limit: 2.1b ( the var that stores the money doesn't go much higher than this by default )
 #define MAX_BANK_ZENY 2100000000
 
+#define MAX_LEVEL 175
 #define MAX_FAME 1000000000
 #define MAX_CART 100
 #define MAX_SKILL 1478
 #define MAX_SKILL_ID 10015   // [Ind/Hercules] max used skill ID
-//Update this max as necessary. 55 is the value needed for Super Baby currently
-//Raised to 84 since Expanded Super Novice needs it.
-#define MAX_SKILL_TREE 84
+// Update this max as necessary. 86 is the value needed for Expanded Super Novice.
+#define MAX_SKILL_TREE 86
 #define DEFAULT_WALK_SPEED 150
 #define MIN_WALK_SPEED 20 /* below 20 clips animation */
 #define MAX_WALK_SPEED 1000
@@ -110,7 +119,7 @@
 #define MAX_GUILD_STORAGE 600
 #define MAX_PARTY 12
 #define MAX_GUILD (16+10*6)     // Increased max guild members +6 per 1 extension levels [Lupus]
-#define MAX_GUILDPOSITION 20    // Increased max guild positions to accomodate for all members [Valaris] (removed) [PoW]
+#define MAX_GUILDPOSITION 20    // Increased max guild positions to accommodate for all members [Valaris] (removed) [PoW]
 #define MAX_GUILDEXPULSION 32
 #define MAX_GUILDALLIANCE 16
 #define MAX_GUILDSKILL 15       // Increased max guild skills because of new skills [Sara-chan]
@@ -199,6 +208,7 @@ enum item_types {
 	IT_MAX
 };
 
+#define INDEX_NOT_FOUND (-1) ///< Used as invalid/failure value in various functions that return an index
 
 // Questlog states
 enum quest_state {
@@ -346,7 +356,7 @@ struct s_pet {
 	short hungry;//pet hungry
 	char name[NAME_LENGTH];
 	char rename_flag;
-	char incuvate;
+	char incubate;
 };
 
 struct s_homunculus { //[orn]
@@ -636,11 +646,21 @@ enum fame_list_type {
 	RANKTYPE_PK         = 3, //Not supported yet
 };
 
-enum { //Change Guild Infos
+/**
+ * Guild Basic Information
+ * It is used to request changes via intif_guild_change_basicinfo in map-server and to
+ * signalize changes made in char-server via mapif_parse_GuildMemberInfoChange
+ **/
+enum guild_basic_info {
 	GBI_EXP = 1,    ///< Guild Experience (EXP)
 	GBI_GUILDLV,    ///< Guild level
 	GBI_SKILLPOINT, ///< Guild skillpoints
-	GBI_SKILLLV,    ///< Guild skill_lv ?? seem unused
+
+	/**
+	 * Changes a skill level, struct guild_skill should be sent.
+	 * All checks regarding max skill level should be done in _map-server_
+	 **/
+	GBI_SKILLLV,    ///< Guild skill_lv
 };
 
 enum { //Change Member Infos
@@ -917,4 +937,4 @@ enum e_pc_reg_loading {
 #error MAX_ZENY is too big
 #endif
 
-#endif /* _COMMON_MMO_H_ */
+#endif /* COMMON_MMO_H */

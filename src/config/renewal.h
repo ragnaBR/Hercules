@@ -1,8 +1,8 @@
 // Copyright (c) Hercules Dev Team, licensed under GNU GPL.
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
-#ifndef _CONFIG_RENEWAL_H_
-#define _CONFIG_RENEWAL_H_
+#ifndef CONFIG_RENEWAL_H
+#define CONFIG_RENEWAL_H
 
 /**
  * Hercules configuration file (http://hercules.ws)
@@ -13,8 +13,18 @@
  * @INFO: This file holds general-purpose renewal settings, for class-specific ones check /src/config/classes folder
  **/
 
+/**
+ * Renewal full toggle switch.
+ *
+ * Uncomment this line to disable all of the below settings at once.
+ * Note: in UNIX builds, this can be easily done without touching this
+ * line, by passing --disable-renewal to the configure script:
+ * ./configure --disable-renewal
+ */
 //#define DISABLE_RENEWAL
-#ifndef DISABLE_RENEWAL
+
+
+#ifndef DISABLE_RENEWAL // Do not change this line
 
 /// game renewal server mode
 /// (disable by commenting the line)
@@ -74,5 +84,6 @@
 #define RENEWAL_ASPD
 
 #endif // DISABLE_RENEWAL
+#undef DISABLE_RENEWAL
 
-#endif // _CONFIG_RENEWAL_H_
+#endif // CONFIG_RENEWAL_H

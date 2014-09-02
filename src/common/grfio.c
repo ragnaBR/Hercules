@@ -2,13 +2,8 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#include "../common/cbasetypes.h"
-#include "../common/des.h"
-#include "../common/malloc.h"
-#include "../common/showmsg.h"
-#include "../common/strlib.h"
-#include "../common/utils.h"
-#include "../common/nullpo.h"
+#define HERCULES_CORE
+
 #include "grfio.h"
 
 #include <stdio.h>
@@ -17,10 +12,18 @@
 #include <sys/stat.h>
 #include <zlib.h>
 
+#include "../common/cbasetypes.h"
+#include "../common/des.h"
+#include "../common/malloc.h"
+#include "../common/nullpo.h"
+#include "../common/showmsg.h"
+#include "../common/strlib.h"
+#include "../common/utils.h"
+
 //----------------------------
 //	file entry table struct
 //----------------------------
-typedef struct _FILELIST {
+typedef struct FILELIST {
 	int srclen;         ///< compressed size
 	int srclen_aligned;
 	int declen;         ///< original size
@@ -415,7 +418,7 @@ void* grfio_reads(const char* fname, int* size)
 			declen = (int)ftell(in);
 			fseek(in,0,SEEK_SET);
 			buf2 = (unsigned char *)aMalloc(declen+1);  // +1 for resnametable zero-termination
-			if(fread(buf2, 1, declen, in) != (size_t)declen) ShowError("An error occured in fread grfio_reads, fname=%s \n",fname);
+			if(fread(buf2, 1, declen, in) != (size_t)declen) ShowError("An error occurred in fread grfio_reads, fname=%s \n",fname);
 			fclose(in);
 
 			if( size )
@@ -437,7 +440,7 @@ void* grfio_reads(const char* fname, int* size)
 			int fsize = entry->srclen_aligned;
 			unsigned char *buf = (unsigned char *)aMalloc(fsize);
 			fseek(in, entry->srcpos, 0);
-			if(fread(buf, 1, fsize, in) != (size_t)fsize) ShowError("An error occured in fread in grfio_reads, grfname=%s\n",grfname);
+			if(fread(buf, 1, fsize, in) != (size_t)fsize) ShowError("An error occurred in fread in grfio_reads, grfname=%s\n",grfname);
 			fclose(in);
 
 			buf2 = (unsigned char *)aMalloc(entry->declen+1);  // +1 for resnametable zero-termination
@@ -580,7 +583,7 @@ static int grfio_entryread(const char* grfname, int gentry)
 		unsigned char *rBuf;
 		uLongf rSize, eSize;
 
-		if(fread(eheader,1,8,fp) != 8) ShowError("An error occured in fread while reading eheader buffer\n");
+		if(fread(eheader,1,8,fp) != 8) ShowError("An error occurred in fread while reading header buffer\n");
 		rSize = getlong(eheader);	// Read Size
 		eSize = getlong(eheader+4);	// Extend Size
 
@@ -592,7 +595,7 @@ static int grfio_entryread(const char* grfname, int gentry)
 
 		rBuf = (unsigned char *)aMalloc(rSize);	// Get a Read Size
 		grf_filelist = (unsigned char *)aMalloc(eSize);	// Get a Extend Size
-		if(fread(rBuf,1,rSize,fp) != rSize) ShowError("An error occured in fread \n");
+		if(fread(rBuf,1,rSize,fp) != rSize) ShowError("An error occurred in fread \n");
 		fclose(fp);
 		decode_zip(grf_filelist, &eSize, rBuf, rSize);	// Decode function
 		aFree(rBuf);
@@ -652,7 +655,7 @@ static bool grfio_parse_restable_row(const char* row)
 	char local[256];
 	FILELIST* entry;
 
-	if( sscanf(row, "%[^#\r\n]#%[^#\r\n]#", w1, w2) != 2 )
+	if (sscanf(row, "%255[^#\r\n]#%255[^#\r\n]#", w1, w2) != 2)
 		return false;
 
 	if( strstr(w2, ".gat") == NULL && strstr(w2, ".rsw") == NULL )
@@ -802,7 +805,7 @@ void grfio_init(const char* fname)
 			if( line[0] == '/' && line[1] == '/' )
 				continue; // skip comments
 
-			if( sscanf(line, "%[^:]: %[^\r\n]", w1, w2) != 2 )
+			if (sscanf(line, "%1023[^:]: %1023[^\r\n]", w1, w2) != 2)
 				continue; // skip unrecognized lines
 
 			// Entry table reading
@@ -824,7 +827,7 @@ void grfio_init(const char* fname)
 	if( grf_num == 0 )
 		ShowInfo("No GRF loaded, using default data directory\n");
 
-	// Unneccessary area release of filelist
+	// Unnecessary area release of filelist
 	filelist_compact();
 
 	// Resource check

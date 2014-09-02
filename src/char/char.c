@@ -2,7 +2,30 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
+#define HERCULES_CORE
+
+#include "../config/core.h" // CONSOLE_INPUT
+#include "char.h"
+
+#include <signal.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <time.h>
+
+#include "int_elemental.h"
+#include "int_guild.h"
+#include "int_homun.h"
+#include "int_mercenary.h"
+#include "int_party.h"
+#include "int_storage.h"
+#include "inter.h"
+#include "pincode.h"
+#include "../common/HPM.h"
 #include "../common/cbasetypes.h"
+#include "../common/console.h"
 #include "../common/core.h"
 #include "../common/db.h"
 #include "../common/malloc.h"
@@ -13,25 +36,6 @@
 #include "../common/strlib.h"
 #include "../common/timer.h"
 #include "../common/utils.h"
-#include "../common/console.h"
-#include "../common/HPM.h"
-#include "int_guild.h"
-#include "int_homun.h"
-#include "int_mercenary.h"
-#include "int_elemental.h"
-#include "int_party.h"
-#include "int_storage.h"
-#include "char.h"
-#include "inter.h"
-#include "pincode.h"
-
-#include <sys/types.h>
-#include <time.h>
-#include <signal.h>
-#include <string.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 // private declarations
 #define CHAR_CONF_NAME	"conf/char-server.conf"
@@ -114,7 +118,7 @@ bool char_new = true;
 int char_new_display = 0;
 
 bool name_ignoring_case = false; // Allow or not identical name for characters but with a different case by [Yor]
-int char_name_option = 0; // Option to know which letters/symbols are authorised in the name of a character (0: all, 1: only those in char_name_letters, 2: all EXCEPT those in char_name_letters) by [Yor]
+int char_name_option = 0; // Option to know which letters/symbols are authorized in the name of a character (0: all, 1: only those in char_name_letters, 2: all EXCEPT those in char_name_letters) by [Yor]
 char unknown_char_name[NAME_LENGTH] = "Unknown"; // Name to use when the requested name cannot be determined
 #define TRIM_CHARS "\255\xA0\032\t\x0A\x0D " //The following characters are trimmed regardless because they cause confusion and problems on the servers. [Skotlex]
 char char_name_letters[1024] = ""; // list of letters/symbols allowed (or not) in a character name. by [Yor]
@@ -122,8 +126,8 @@ char char_name_letters[1024] = ""; // list of letters/symbols allowed (or not) i
 int char_del_level = 0; //From which level u can delete character [Lupus]
 int char_del_delay = 86400;
 
-int log_char = 1;	// loggin char or not [devil]
-int log_inter = 1;	// loggin inter or not [devil]
+int log_char = 1;	// logging char or not [devil]
+int log_inter = 1;	// logging inter or not [devil]
 
 int char_aegis_delete = 0; // Verify if char is in guild/party or char and reacts as Aegis does (doesn't allow deletion), see char_delete2_req for more information
 
@@ -793,7 +797,7 @@ int memitemdata_to_sql(const struct item items[], int max, int id, int tableswit
 					StrBuf->Printf(&buf, "UPDATE `%s` SET `amount`='%d', `equip`='%d', `identify`='%d', `refine`='%d',`attribute`='%d', `expire_time`='%u', `bound`='%d'",
 						tablename, items[i].amount, items[i].equip, items[i].identify, items[i].refine, items[i].attribute, items[i].expire_time, items[i].bound);
  					for( j = 0; j < MAX_SLOTS; ++j )for( j = 0; j < MAX_SLOTS; ++j )
-						StrBuf->Printf(&buf, ", `card%d`=%d", j, items[i].card[j]);	
+						StrBuf->Printf(&buf, ", `card%d`=%d", j, items[i].card[j]);
  					StrBuf->Printf(&buf, " WHERE `id`='%d' LIMIT 1", item.id);
 
 					if( SQL_ERROR == SQL->QueryStr(sql_handle, StrBuf->Value(&buf)) )
@@ -1383,7 +1387,7 @@ int mmo_char_fromsql(int char_id, struct mmo_charstatus* p, bool load_everything
 	if( SQL_SUCCESS == SQL->StmtNextRow(stmt) )
 		strcat(t_msg, " accdata");
 
-	if (save_log) ShowInfo("Loaded char (%d - %s): %s\n", char_id, p->name, t_msg);	//ok. all data load successfuly!
+	if (save_log) ShowInfo("Loaded char (%d - %s): %s\n", char_id, p->name, t_msg);	//ok. all data load successfully!
 	SQL->StmtFree(stmt);
 	StrBuf->Destroy(&buf);
 
@@ -1409,7 +1413,7 @@ int mmo_char_sql_init(void)
 	//and send the loginserver the new state....
 
 	// Force all users offline in sql when starting char-server
-	// (useful when servers crashs and don't clean the database)
+	// (useful when servers crashes and don't clean the database)
 	set_all_offline_sql();
 
 	return 0;
@@ -1464,7 +1468,7 @@ bool char_slotchange(struct char_session_data *sd, int fd, unsigned short from, 
 }
 
 //-----------------------------------
-// Function to change chararcter's names
+// Function to change character's names
 //-----------------------------------
 int rename_char_sql(struct char_session_data *sd, int char_id)
 {
@@ -1536,9 +1540,9 @@ int check_char_name(char * name, char * esc_name)
 	if( strcmpi(name, wisp_server_name) == 0 )
 		return -1; // nick reserved for internal server messages
 
-	// Check Authorised letters/symbols in the name of the character
+	// Check Authorized letters/symbols in the name of the character
 	if( char_name_option == 1 )
-	{ // only letters/symbols in char_name_letters are authorised
+	{ // only letters/symbols in char_name_letters are authorized
 		for( i = 0; i < NAME_LENGTH && name[i]; i++ )
 			if( strchr(char_name_letters, name[i]) == NULL )
 				return -2;
@@ -1572,7 +1576,7 @@ int check_char_name(char * name, char * esc_name)
  *  -1: 'Charname already exists'
  *  -2: 'Char creation denied'/ Unknown error
  *  -3: 'You are underaged'
- *  -4: 'You are not elegible to open the Character Slot.'
+ *  -4: 'You are not eligible to open the Character Slot.'
  *  -5: 'Symbols in Character Names are forbidden'
  *  char_id: Success
  **/
@@ -1670,7 +1674,7 @@ int make_new_char_sql(struct char_session_data* sd, char* name_, int str, int ag
 			{
 				if( SQL_ERROR == SQL->Query(sql_handle,
 					"INSERT INTO `%s` (`char_id`,`nameid`, `amount`, `identify`) VALUES ('%d', '%d', '%d', '%d')",
-					inventory_db, char_id, start_items[k], 1, 1) 
+					inventory_db, char_id, start_items[k], 1, 1)
 					)
 					Sql_ShowDebug(sql_handle);
 			}
@@ -1776,7 +1780,7 @@ int delete_char_sql(int char_id)
 
 	/* delete char's pet */
 	//Delete the hatched pet if you have one...
-	if( SQL_ERROR == SQL->Query(sql_handle, "DELETE FROM `%s` WHERE `char_id`='%d' AND `incuvate` = '0'", pet_db, char_id) )
+	if( SQL_ERROR == SQL->Query(sql_handle, "DELETE FROM `%s` WHERE `char_id`='%d' AND `incubate` = '0'", pet_db, char_id) )
 		Sql_ShowDebug(sql_handle);
 
 	//Delete all pets that are stored in eggs (inventory + cart)
@@ -2044,7 +2048,7 @@ int mmo_char_send006b(int fd, struct char_session_data* sd)
 	int j, offset = 0;
 #if PACKETVER >= 20100413
 	offset += 3;
-#endif	
+#endif
 	if (save_log)
 		ShowInfo("Loading Char Data ("CL_BOLD"%d"CL_RESET")\n",sd->account_id);
 	
@@ -2198,7 +2202,7 @@ void mapif_server_reset(int id);
 void loginif_reset(void)
 {
 	int id;
-	// TODO kick everyone out and reset everything or wait for connect and try to reaquire locks [FlavioJS]
+	// TODO kick everyone out and reset everything or wait for connect and try to reacquire locks [FlavioJS]
 	for( id = 0; id < ARRAYLENGTH(server); ++id )
 		mapif_server_reset(id);
 	flush_fifos();
@@ -2282,7 +2286,7 @@ int parse_fromlogin(int fd) {
 		
 		switch( command ) {
 
-			// acknowledgement of connect-to-loginserver request
+			// acknowledgment of connect-to-loginserver request
 			case 0x2711:
 				if (RFIFOREST(fd) < 3)
 					return 0;
@@ -2302,7 +2306,7 @@ int parse_fromlogin(int fd) {
 				RFIFOSKIP(fd,3);
 			break;
 
-			// acknowledgement of account authentication request
+			// acknowledgment of account authentication request
 			case 0x2713:
 				if (RFIFOREST(fd) < 33)
 					return 0;
@@ -2522,7 +2526,7 @@ int parse_fromlogin(int fd) {
 				unsigned char buf[11];
 				WBUFW(buf,0) = 0x2b14;
 				WBUFL(buf,2) = RFIFOL(fd,2);
-				WBUFB(buf,6) = RFIFOB(fd,6); // 0: change of statut, 1: ban
+				WBUFB(buf,6) = RFIFOB(fd,6); // 0: change of status, 1: ban
 				WBUFL(buf,7) = RFIFOL(fd,7); // status or final date of a banishment
 				mapif_sendall(buf, 11);
 			}
@@ -3142,9 +3146,8 @@ int parse_frommap(int fd)
 				int aid = RFIFOL(fd,4), cid = RFIFOL(fd,8), size = RFIFOW(fd,2);
 				struct online_char_data* character;
 
-				if (size - 13 != sizeof(struct mmo_charstatus))
-				{
-					ShowError("parse_from_map (save-char): Size mismatch! %d != %d\n", size-13, sizeof(struct mmo_charstatus));
+				if (size - 13 != sizeof(struct mmo_charstatus)) {
+					ShowError("parse_from_map (save-char): Size mismatch! %d != %"PRIuS"\n", size-13, sizeof(struct mmo_charstatus));
 					RFIFOSKIP(fd,size);
 					break;
 				}
@@ -3157,7 +3160,7 @@ int parse_frommap(int fd)
 					memcpy(&char_dat, RFIFOP(fd,13), sizeof(struct mmo_charstatus));
 					mmo_char_tosql(cid, &char_dat);
 				} else {	//This may be valid on char-server reconnection, when re-sending characters that already logged off.
-					ShowError("parse_from_map (save-char): Received data for non-existant/offline character (%d:%d).\n", aid, cid);
+					ShowError("parse_from_map (save-char): Received data for non-existing/offline character (%d:%d).\n", aid, cid);
 					set_char_online(id, cid, aid);
 				}
 
@@ -3974,7 +3977,7 @@ static void char_delete2_req(int fd, struct char_session_data* sd)
 	// see issue: 7338
 	if( char_aegis_delete )
 	{
-		if( SQL_SUCCESS != SQL->Query(sql_handle, "SELECT `party_id`, `guild_id` FROM `%s` WHERE `char_id`='%d'", char_db, char_id) 
+		if( SQL_SUCCESS != SQL->Query(sql_handle, "SELECT `party_id`, `guild_id` FROM `%s` WHERE `char_id`='%d'", char_db, char_id)
 		|| SQL_SUCCESS != SQL->NextRow(sql_handle)
 		)
 		{
@@ -4170,7 +4173,7 @@ int parse_char(int fd)
 				ShowInfo("request connect - account_id:%d/login_id1:%d/login_id2:%d\n", account_id, login_id1, login_id2);
 
 				if (sd) {
-					//Received again auth packet for already authentified account?? Discard it.
+					//Received again auth packet for already authenticated account?? Discard it.
 					//TODO: Perhaps log this as a hack attempt?
 					//TODO: and perhaps send back a reply?
 					break;
@@ -4197,7 +4200,7 @@ int parse_char(int fd)
 					break;
 				}
 
-				// search authentification
+				// search authentication
 				node = (struct auth_node*)idb_get(auth_db, account_id);
 				if( node != NULL &&
 					node->account_id == account_id &&
@@ -4228,7 +4231,7 @@ int parse_char(int fd)
 				{// authentication not found (coming from login server)
 					if (login_fd > 0) { // don't send request if no login-server
 						WFIFOHEAD(login_fd,23);
-						WFIFOW(login_fd,0) = 0x2712; // ask login-server to authentify an account
+						WFIFOW(login_fd,0) = 0x2712; // ask login-server to authenticate an account
 						WFIFOL(login_fd,2) = sd->account_id;
 						WFIFOL(login_fd,6) = sd->login_id1;
 						WFIFOL(login_fd,10) = sd->login_id2;
@@ -4264,7 +4267,7 @@ int parse_char(int fd)
 				
 #if PACKETVER >= 20110309
 				if( *pincode->enabled ){ // hack check
-					struct online_char_data* character;	
+					struct online_char_data* character;
 					character = (struct online_char_data*)idb_get(online_char_db, sd->account_id);
 					if( character && character->pincode_enable == -1){
 						WFIFOHEAD(fd,3);
@@ -4313,7 +4316,7 @@ int parse_char(int fd)
 					break;
 				}
 				
-				/* set char as online prior to loading its data so 3rd party applications will realise the sql data is not reliable */
+				/* set char as online prior to loading its data so 3rd party applications will realize the sql data is not reliable */
 				set_char_online(-2,char_id,sd->account_id);
 				if( !mmo_char_fromsql(char_id, &char_dat, true) ) { /* failed? set it back offline */
 					set_char_offline(char_id, sd->account_id);
@@ -4455,13 +4458,13 @@ int parse_char(int fd)
 					WFIFOW(fd,0) = 0x6e;
 					/* Others I found [Ind] */
 					/* 0x02 = Symbols in Character Names are forbidden */
-					/* 0x03 = You are not elegible to open the Character Slot. */
+					/* 0x03 = You are not eligible to open the Character Slot. */
 					/* 0x0B = This service is only available for premium users.  */
 					switch (result) {
 						case -1: WFIFOB(fd,2) = 0x00; break; // 'Charname already exists'
 						case -2: WFIFOB(fd,2) = 0xFF; break; // 'Char creation denied'
 						case -3: WFIFOB(fd,2) = 0x01; break; // 'You are underaged'
-						case -4: WFIFOB(fd,2) = 0x03; break; // 'You are not elegible to open the Character Slot.'
+						case -4: WFIFOB(fd,2) = 0x03; break; // 'You are not eligible to open the Character Slot.'
 						case -5: WFIFOB(fd,2) = 0x02; break; // 'Symbols in Character Names are forbidden'
 
 						default:
@@ -4504,7 +4507,7 @@ int parse_char(int fd)
 				int i;
 #if PACKETVER >= 20110309
 				if( *pincode->enabled ){ // hack check
-					struct online_char_data* character;	
+					struct online_char_data* character;
 					character = (struct online_char_data*)idb_get(online_char_db, sd->account_id);
 					if( character && character->pincode_enable == -1 ){
 						WFIFOHEAD(fd,3);
@@ -4637,7 +4640,7 @@ int parse_char(int fd)
 			//Confirm change name.
 			// 0x28f <char_id>.L
 			case 0x28f:
-				// 0: Sucessfull
+				// 0: Successful
 				// 1: This character's name has already been changed. You cannot change a character's name more than once.
 				// 2: User information is not correct.
 				// 3: You have failed to change this character's name.
@@ -4742,7 +4745,7 @@ int parse_char(int fd)
 
 				RFIFOSKIP(fd,60);
 			}
-			return 0; // avoid processing of followup packets here
+			return 0; // avoid processing of follow-up packets here
 				
 			// checks the entered pin
 			case 0x8b8:
@@ -5002,8 +5005,8 @@ static int online_data_cleanup(int tid, int64 tick, int id, intptr_t data) {
 }
 
 //----------------------------------
-// Reading Lan Support configuration
-// Rewrote: Anvanced subnet check [LuzZza]
+// Reading LAN Support configuration
+// Rewrote: Advanced subnet check [LuzZza]
 //----------------------------------
 int char_lan_config_read(const char *lancfgName)
 {
@@ -5021,7 +5024,7 @@ int char_lan_config_read(const char *lancfgName)
 		if ((line[0] == '/' && line[1] == '/') || line[0] == '\n' || line[1] == '\n')
 			continue;
 
-		if(sscanf(line,"%[^:]: %[^:]:%[^:]:%[^\r\n]", w1, w2, w3, w4) != 4) {
+		if (sscanf(line,"%63[^:]: %63[^:]:%63[^:]:%63[^\r\n]", w1, w2, w3, w4) != 4) {
 
 			ShowWarning("Error syntax of configuration file %s in line %d.\n", lancfgName, line_num);
 			continue;
@@ -5070,7 +5073,7 @@ void sql_config_read(const char* cfgName)
 		if(line[0] == '/' && line[1] == '/')
 			continue;
 
-		if (sscanf(line, "%[^:]: %[^\r\n]", w1, w2) != 2)
+		if (sscanf(line, "%1023[^:]: %1023[^\r\n]", w1, w2) != 2)
 			continue;
 
 		if(!strcmpi(w1,"char_db"))
@@ -5178,7 +5181,7 @@ int char_config_read(const char* cfgName)
 		if (line[0] == '/' && line[1] == '/')
 			continue;
 
-		if (sscanf(line, "%[^:]: %[^\r\n]", w1, w2) != 2)
+		if (sscanf(line, "%1023[^:]: %1023[^\r\n]", w1, w2) != 2)
 			continue;
 
 		remove_control_chars(w1);
@@ -5336,7 +5339,7 @@ int char_config_read(const char* cfgName)
 	return 0;
 }
 
-void do_final(void) {
+int do_final(void) {
 	int i;
 	
 	ShowStatus("Terminating...\n");
@@ -5373,6 +5376,7 @@ void do_final(void) {
 			aFree(server[i].map);
 	
 	ShowStatus("Finished.\n");
+	return EXIT_SUCCESS;
 }
 
 //------------------------------
@@ -5474,7 +5478,7 @@ int do_init(int argc, char **argv) {
 	timer->add_func_list(online_data_cleanup, "online_data_cleanup");
 	timer->add_interval(timer->gettick() + 1000, online_data_cleanup, 0, 0, 600 * 1000);
 
-	//Cleaning the tables for NULL entrys @ startup [Sirius]
+	//Cleaning the tables for NULL entries @ startup [Sirius]
 	//Chardb clean
 	if( SQL_ERROR == SQL->Query(sql_handle, "DELETE FROM `%s` WHERE `account_id` = '0'", char_db) )
 		Sql_ShowDebug(sql_handle);
@@ -5496,7 +5500,7 @@ int do_init(int argc, char **argv) {
 	
 	Sql_HerculesUpdateCheck(sql_handle);
 #ifdef CONSOLE_INPUT
-	console->setSQL(sql_handle);
+	console->input->setSQL(sql_handle);
 #endif
 	ShowStatus("The char-server is "CL_GREEN"ready"CL_RESET" (Server is listening on the port %d).\n\n", char_port);
 	

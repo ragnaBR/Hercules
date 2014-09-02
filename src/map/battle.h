@@ -2,11 +2,11 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#ifndef _MAP_BATTLE_H_
-#define _MAP_BATTLE_H_
+#ifndef MAP_BATTLE_H
+#define MAP_BATTLE_H
 
-#include "../common/cbasetypes.h"
 #include "map.h" //ELE_MAX
+#include "../common/cbasetypes.h"
 
 /**
  * Declarations
@@ -21,12 +21,12 @@ struct status_data;
 /**
  * Defines
  **/
-#define MIN_HAIR_STYLE  (battle_config.min_hair_style)
-#define MAX_HAIR_STYLE  (battle_config.max_hair_style)
-#define MIN_HAIR_COLOR  (battle_config.min_hair_color)
-#define MAX_HAIR_COLOR  (battle_config.max_hair_color)
-#define MIN_CLOTH_COLOR (battle_config.min_cloth_color)
-#define MAX_CLOTH_COLOR (battle_config.max_cloth_color)
+#define MIN_HAIR_STYLE  (battle->bc->min_hair_style)
+#define MAX_HAIR_STYLE  (battle->bc->max_hair_style)
+#define MIN_HAIR_COLOR  (battle->bc->min_hair_color)
+#define MAX_HAIR_COLOR  (battle->bc->max_hair_color)
+#define MIN_CLOTH_COLOR (battle->bc->min_cloth_color)
+#define MAX_CLOTH_COLOR (battle->bc->max_cloth_color)
 
 #define	is_boss(bl)     (status_get_mode(bl)&MD_BOSS)	// Can refine later [Aru]
 
@@ -79,7 +79,7 @@ enum e_battle_check_target { //New definitions [Skotlex]
  * Structures
  **/
 
-// dammage structure
+// damage structure
 struct Damage {
 	int64 damage,damage2; //right, left dmg
 	int type,div_; //chk clif_damage for type @TODO add an enum ? ;  nb of hit
@@ -416,6 +416,7 @@ struct Battle_Config {
 	int invincible_nodamage;
 	int mob_slave_keep_target;
 	int autospell_check_range;	//Enable range check for autospell bonus. [L0ne_W0lf]
+	int knockback_left;
 	int client_reshuffle_dice;  // Reshuffle /dice
 	int client_sort_storage;
 	int feature_buying_store;
@@ -449,10 +450,12 @@ struct Battle_Config {
 	int atcommand_mobinfo_type;
 	
 	int mob_size_influence; // Enable modifications on earned experience, drop rates and monster status depending on monster size. [mkbu95]
-	
+	int bowling_bash_area;
+
 	/** Hercules **/
 	int skill_trap_type;
 	int item_restricted_consumption_type;
+	int unequip_restricted_equipment;
 	int max_walk_path;
 	int item_enabled_npc;
 	int packet_obfuscation;
@@ -469,7 +472,11 @@ struct Battle_Config {
 	int mon_trans_disable_in_gvg;
 
 	int case_sensitive_aegisnames;
-} battle_config;
+	int guild_castle_invite;
+	int guild_castle_expulsion;
+};
+
+extern struct Battle_Config battle_config;
 
 /* criteria for battle_config.idletime_critera */
 enum e_battle_config_idletime {
@@ -485,7 +492,7 @@ enum e_battle_config_idletime {
 	BCIDLE_ATCOMMAND     = 0x200,
 };
 
-// Dammage delayed info
+// Damage delayed info
 struct delay_damage {
 	int src_id;
 	int target_id;
@@ -537,9 +544,9 @@ struct battle_interface {
 	int64 (*attr_fix) (struct block_list *src, struct block_list *target, int64 damage, int atk_elem, int def_type, int def_lv);
 	/* applies card modifiers */
 	int64 (*calc_cardfix) (int attack_type, struct block_list *src, struct block_list *target, int nk, int s_ele, int s_ele_, int64 damage, int left, int flag);
-	/* applies element modifiers */	
+	/* applies element modifiers */
 	int64 (*calc_elefix) (struct block_list *src, struct block_list *target, uint16 skill_id, uint16 skill_lv, int64 damage, int nk, int n_ele, int s_ele, int s_ele_, bool left, int flag);
-	/* applies mastery modifiers */	
+	/* applies mastery modifiers */
 	int64 (*calc_masteryfix) (struct block_list *src, struct block_list *target, uint16 skill_id, uint16 skill_lv, int64 damage, int div, bool left, bool weapon);
 	/* calculates chorus bonus */
 	int (*calc_chorusbonus) (struct map_session_data *sd);
@@ -567,7 +574,7 @@ struct battle_interface {
 	int (*check_target) (struct block_list *src, struct block_list *target,int flag);
 	/* is src and bl within range? */
 	bool (*check_range) (struct block_list *src,struct block_list *bl,int range);
-	/* consume amo for this skill and lv */
+	/* consume ammo for this skill and lv */
 	void (*consume_ammo) (struct map_session_data* sd, int skill_id, int lv);
 	int (*get_targeted_sub) (struct block_list *bl, va_list ap);
 	int (*get_enemy_sub) (struct block_list *bl, va_list ap);
@@ -599,4 +606,4 @@ struct battle_interface {
 struct battle_interface *battle;
 
 void battle_defaults(void);
-#endif /* _MAP_BATTLE_H_ */
+#endif /* MAP_BATTLE_H */

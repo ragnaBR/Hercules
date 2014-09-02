@@ -2,37 +2,39 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#include "../common/db.h"
-#include "../common/timer.h"
-#include "../common/nullpo.h"
-#include "../common/malloc.h"
-#include "../common/random.h"
-#include "../common/showmsg.h"
-#include "../common/strlib.h"
-#include "../common/utils.h"
-#include "../common/ers.h"
+#define HERCULES_CORE
 
-#include "pc.h"
-#include "status.h"
-#include "map.h"
-#include "path.h"
-#include "intif.h"
-#include "clif.h"
-#include "chrif.h"
 #include "pet.h"
-#include "itemdb.h"
-#include "battle.h"
-#include "mob.h"
-#include "npc.h"
-#include "script.h"
-#include "skill.h"
-#include "unit.h"
-#include "atcommand.h" // msg_txt()
-#include "log.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "atcommand.h" // msg_txt()
+#include "battle.h"
+#include "chrif.h"
+#include "clif.h"
+#include "intif.h"
+#include "itemdb.h"
+#include "log.h"
+#include "map.h"
+#include "mob.h"
+#include "npc.h"
+#include "path.h"
+#include "pc.h"
+#include "script.h"
+#include "skill.h"
+#include "status.h"
+#include "unit.h"
+#include "../common/db.h"
+#include "../common/ers.h"
+#include "../common/malloc.h"
+#include "../common/nullpo.h"
+#include "../common/random.h"
+#include "../common/showmsg.h"
+#include "../common/strlib.h"
+#include "../common/timer.h"
+#include "../common/utils.h"
 
 struct pet_interface pet_s;
 
@@ -97,7 +99,7 @@ int pet_unlocktarget(struct pet_data *pd)
  * Pet Attack Skill [Skotlex]
  *------------------------------------------*/
 int pet_attackskill(struct pet_data *pd, int target_id) {
-	if (!battle_config.pet_status_support || !pd->a_skill || 
+	if (!battle_config.pet_status_support || !pd->a_skill ||
 		(battle_config.pet_equip_required && !pd->pet.equip))
 		return 0;
 
@@ -105,7 +107,7 @@ int pet_attackskill(struct pet_data *pd, int target_id) {
 		return 0;
 	
 	if (rnd()%100 < (pd->a_skill->rate +pd->pet.intimate*pd->a_skill->bonusrate/1000)) {
-		//Skotlex: Use pet's skill 
+		//Skotlex: Use pet's skill
 		int inf;
 		struct block_list *bl;
 
@@ -156,7 +158,7 @@ int pet_target_check(struct map_session_data *sd,struct block_list *bl,int type)
 		if(pd->petDB->defence_attack_rate > 0 && rate <= 0)
 			rate = 1;
 	}
-	if(rnd()%10000 < rate) 
+	if(rnd()%10000 < rate)
 	{
 		if(pd->target_id == 0 || rnd()%10000 < pd->petDB->change_target_rate)
 			pd->target_id = bl->id;
@@ -301,7 +303,7 @@ int pet_return_egg(struct map_session_data *sd, struct pet_data *pd)
 		clif->additem(sd,0,0,flag);
 		map->addflooritem(&tmp_item,1,sd->bl.m,sd->bl.x,sd->bl.y,0,0,0,0);
 	}
-	pd->pet.incuvate = 1;
+	pd->pet.incubate = 1;
 	unit->free(&pd->bl,CLR_OUTSIGHT);
 
 	status_calc_pc(sd,SCO_NONE);
@@ -317,7 +319,7 @@ int pet_data_init(struct map_session_data *sd, struct s_pet *petinfo)
 
 	nullpo_retr(1, sd);
 
-	Assert((sd->status.pet_id == 0 || sd->pd == 0) || sd->pd->msd == sd); 
+	Assert((sd->status.pet_id == 0 || sd->pd == 0) || sd->pd->msd == sd);
 
 	if(sd->status.account_id != petinfo->account_id || sd->status.char_id != petinfo->char_id) {
 		sd->status.pet_id = 0;
@@ -325,8 +327,8 @@ int pet_data_init(struct map_session_data *sd, struct s_pet *petinfo)
 	}
 	if (sd->status.pet_id != petinfo->pet_id) {
 		if (sd->status.pet_id) {
-			//Wrong pet?? Set incuvate to no and send it back for saving.
-			petinfo->incuvate = 1;
+			//Wrong pet?? Set incubate to no and send it back for saving.
+			petinfo->incubate = 1;
 			intif->save_petdata(sd->status.account_id,petinfo);
 			sd->status.pet_id = 0;
 			return 1;
@@ -388,14 +390,14 @@ int pet_birth_process(struct map_session_data *sd, struct s_pet *petinfo)
 {
 	nullpo_retr(1, sd);
 
-	Assert((sd->status.pet_id == 0 || sd->pd == 0) || sd->pd->msd == sd); 
+	Assert((sd->status.pet_id == 0 || sd->pd == 0) || sd->pd->msd == sd);
 
-	if(sd->status.pet_id && petinfo->incuvate == 1) {
+	if(sd->status.pet_id && petinfo->incubate == 1) {
 		sd->status.pet_id = 0;
 		return 1;
 	}
 
-	petinfo->incuvate = 0;
+	petinfo->incubate = 0;
 	petinfo->account_id = sd->status.account_id;
 	petinfo->char_id = sd->status.char_id;
 	sd->status.pet_id = petinfo->pet_id;
@@ -416,7 +418,7 @@ int pet_birth_process(struct map_session_data *sd, struct s_pet *petinfo)
 		clif->send_petdata(NULL, sd->pd, 3, sd->pd->vd.head_bottom);
 		clif->send_petstatus(sd);
 	}
-	Assert((sd->status.pet_id == 0 || sd->pd == 0) || sd->pd->msd == sd); 
+	Assert((sd->status.pet_id == 0 || sd->pd == 0) || sd->pd->msd == sd);
 
 	return 0;
 }
@@ -431,7 +433,7 @@ int pet_recv_petdata(int account_id,struct s_pet *p,int flag) {
 		sd->status.pet_id = 0;
 		return 1;
 	}
-	if(p->incuvate == 1) {
+	if(p->incubate == 1) {
 		int i;
 		//Delete egg from inventory. [Skotlex]
 		for (i = 0; i < MAX_INVENTORY; i++) {
@@ -594,12 +596,12 @@ int pet_menu(struct map_session_data *sd,int menunum)
 		return 1;
 	
 	//You lost the pet already.
-	if(!sd->status.pet_id || sd->pd->pet.intimate <= 0 || sd->pd->pet.incuvate)
+	if(!sd->status.pet_id || sd->pd->pet.intimate <= 0 || sd->pd->pet.incubate)
 		return 1;
 		
 	egg_id = itemdb->exists(sd->pd->petDB->EggID);
 	if (egg_id) {
-		if ((egg_id->flag.trade_restriction&0x01) && !pc->inventoryblank(sd)) {
+		if ((egg_id->flag.trade_restriction&ITR_NODROP) && !pc->inventoryblank(sd)) {
 			clif->message(sd->fd, msg_txt(451)); // You can't return your pet because your inventory is full.
 			return 1;
 		}
@@ -741,42 +743,39 @@ int pet_unequipitem(struct map_session_data *sd, struct pet_data *pd) {
 	return 0;
 }
 
-int pet_food(struct map_session_data *sd, struct pet_data *pd)
-{
-	int i,k;
+int pet_food(struct map_session_data *sd, struct pet_data *pd) {
+	int i, food_id;
 
-	k=pd->petDB->FoodID;
-	i=pc->search_inventory(sd,k);
-	if(i < 0) {
-		clif->pet_food(sd,k,0);
+	food_id = pd->petDB->FoodID;
+	i = pc->search_inventory(sd, food_id);
+	if(i == INDEX_NOT_FOUND) {
+		clif->pet_food(sd, food_id, 0);
 		return 1;
 	}
 	pc->delitem(sd,i,1,0,0,LOG_TYPE_CONSUME);
 
-	if( pd->pet.hungry > 90 )
+	if (pd->pet.hungry > 90) {
 		pet->set_intimate(pd, pd->pet.intimate - pd->petDB->r_full);
-	else
-	{
-		if( battle_config.pet_friendly_rate != 100 )
-			k = (pd->petDB->r_hungry * battle_config.pet_friendly_rate)/100;
+	} else {
+		int add_intimate = 0;
+		if (battle_config.pet_friendly_rate != 100)
+			add_intimate = (pd->petDB->r_hungry * battle_config.pet_friendly_rate)/100;
 		else
-			k = pd->petDB->r_hungry;
-		if( pd->pet.hungry > 75 )
-		{
-			k = k >> 1;
-			if( k <= 0 )
-				k = 1;
+			add_intimate = pd->petDB->r_hungry;
+		if (pd->pet.hungry > 75) {
+			add_intimate = add_intimate >> 1;
+			if (add_intimate <= 0)
+				add_intimate = 1;
 		}
-		pet->set_intimate(pd, pd->pet.intimate + k);
+		pet->set_intimate(pd, pd->pet.intimate + add_intimate);
 	}
-	if( pd->pet.intimate <= 0 )
-	{
+	if (pd->pet.intimate <= 0) {
 		pd->pet.intimate = 0;
 		pet_stop_attack(pd);
 		pd->status.speed = pd->db->status.speed;
-	}
-	else if( pd->pet.intimate > 1000 )
+	} else if (pd->pet.intimate > 1000) {
 		pd->pet.intimate = 1000;
+	}
 	status_calc_pet(pd, SCO_NONE);
 	pd->pet.hungry += pd->petDB->fullness;
 	if( pd->pet.hungry > 100 )
@@ -910,7 +909,7 @@ int pet_ai_sub_hard(struct pet_data *pd, struct map_session_data *sd, int64 tick
 		(pd->ud.attacktimer != INVALID_TIMER || pd->ud.walktimer != INVALID_TIMER))
 		return 0; //Target already locked.
 
-	if (target->type != BL_ITEM) 
+	if (target->type != BL_ITEM)
 	{ //enemy targetted
 		if(!battle->check_range(&pd->bl,target,pd->status.rhw.range))
 		{	//Chase
@@ -932,7 +931,7 @@ int pet_ai_sub_hard(struct pet_data *pd, struct map_session_data *sd, int64 tick
 				memcpy(&pd->loot->item[pd->loot->count++],&fitem->item_data,sizeof(pd->loot->item[0]));
 				pd->loot->weight += itemdb_weight(fitem->item_data.nameid)*fitem->item_data.amount;
 				map->clearflooritem(target);
-			} 
+			}
 			//Target is unlocked regardless of whether it was picked or not.
 			pet->unlocktarget(pd);
 		}
@@ -1048,7 +1047,7 @@ int pet_lootitem_drop(struct pet_data *pd,struct map_session_data *sd)
 
 /*==========================================
  * pet bonus giving skills [Valaris] / Rewritten by [Skotlex]
- *------------------------------------------*/ 
+ *------------------------------------------*/
 int pet_skill_bonus_timer(int tid, int64 tick, int id, intptr_t data) {
 	struct map_session_data *sd=map->id2sd(id);
 	struct pet_data *pd;
@@ -1089,7 +1088,7 @@ int pet_skill_bonus_timer(int tid, int64 tick, int id, intptr_t data) {
 
 /*==========================================
  * pet recovery skills [Valaris] / Rewritten by [Skotlex]
- *------------------------------------------*/ 
+ *------------------------------------------*/
 int pet_recovery_timer(int tid, int64 tick, int id, intptr_t data) {
 	struct map_session_data *sd=map->id2sd(id);
 	struct pet_data *pd;
@@ -1105,7 +1104,7 @@ int pet_recovery_timer(int tid, int64 tick, int id, intptr_t data) {
 	}
 
 	if(sd->sc.data[pd->recovery->type])
-	{	//Display a heal animation? 
+	{	//Display a heal animation?
 		//Detoxify is chosen for now.
 		clif->skill_nodamage(&pd->bl,&sd->bl,TF_DETOXIFY,1,1);
 		status_change_end(&sd->bl, pd->recovery->type, INVALID_TIMER);
@@ -1153,7 +1152,7 @@ int pet_heal_timer(int tid, int64 tick, int id, intptr_t data) {
 
 /*==========================================
  * pet support skills [Skotlex]
- *------------------------------------------*/ 
+ *------------------------------------------*/
 int pet_skill_support_timer(int tid, int64 tick, int id, intptr_t data) {
 	struct map_session_data *sd=map->id2sd(id);
 	struct pet_data *pd;
@@ -1200,7 +1199,7 @@ int pet_skill_support_timer(int tid, int64 tick, int id, intptr_t data) {
  * Pet read db data
  * pet->db.txt
  * pet->db2.txt
- *------------------------------------------*/ 
+ *------------------------------------------*/
 int read_petdb()
 {
 	char* filename[] = {"pet_db.txt","pet_db2.txt"};
@@ -1327,9 +1326,9 @@ int read_petdb()
 			pet->db[j].equip_script = NULL;
 
 			if( *str[20] )
-				pet->db[j].pet_script = script->parse(str[20], filename[i], lines, 0);
+				pet->db[j].pet_script = script->parse(str[20], filename[i], lines, 0, NULL);
 			if( *str[21] )
-				pet->db[j].equip_script = script->parse(str[21], filename[i], lines, 0);
+				pet->db[j].equip_script = script->parse(str[21], filename[i], lines, 0, NULL);
 
 			j++;
 			entries++;

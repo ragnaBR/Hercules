@@ -2,8 +2,8 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#ifndef _CONFIG_CONSTANTS_H_
-#define _CONFIG_CONSTANTS_H_
+#ifndef CONFIG_CONSTANTS_H
+#define CONFIG_CONSTANTS_H
 
 /**
  * Hercules configuration file (http://hercules.ws)
@@ -15,7 +15,7 @@
  */
 
 /**
- * "Sane Checks" to save you from compiling with cool bugs 
+ * "Sane Checks" to save you from compiling with cool bugs
  **/
 #if SECURE_NPCTIMEOUT_INTERVAL <= 0
 	#error SECURE_NPCTIMEOUT_INTERVAL should be at least 1 (1s)
@@ -50,13 +50,6 @@
 	typedef signed char defType;
 	#define DEFTYPE_MIN CHAR_MIN
 	#define DEFTYPE_MAX CHAR_MAX
-#endif
-
-/* pointer size fix which fixes several gcc warnings */
-#ifdef __64BIT__
-	#define __64BPTRSIZE(y) ((intptr)(y))
-#else
-	#define __64BPTRSIZE(y) (y)
 #endif
 
 /* ATCMD_FUNC(mobinfo) HIT and FLEE calculations */
@@ -94,14 +87,6 @@
 	#define RE_LVL_TMDMOD()
 #endif
 
-/* Feb 1st 2012 */
-#if PACKETVER >= 20120201
-	#define NEW_CARTS
-	#define MAX_CARTS 9
-#else
-	#define MAX_CARTS 5
-#endif
-
 // Renewal variable cast time reduction
 #ifdef RENEWAL_CAST
 	#define VARCAST_REDUCTION(val) do { \
@@ -118,4 +103,4 @@
 /**
  * End of File
  **/
-#endif /* _CONFIG_CONSTANTS_H_ */
+#endif /* CONFIG_CONSTANTS_H */

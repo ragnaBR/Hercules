@@ -2,8 +2,8 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#ifndef _MAP_LOG_H_
-#define _MAP_LOG_H_
+#ifndef MAP_LOG_H
+#define MAP_LOG_H
 
 #include "../common/cbasetypes.h"
 #include "../common/sql.h"
@@ -11,11 +11,10 @@
 /**
  * Declarations
  **/
-struct block_list;
-struct map_session_data;
-struct mob_data;
 struct item;
 struct item_data;
+struct map_session_data;
+struct mob_data;
 
 /**
  * Defines
@@ -134,4 +133,4 @@ struct log_interface *logs;
 
 void log_defaults(void);
 
-#endif /* _MAP_LOG_H_ */
+#endif /* MAP_LOG_H */

@@ -2,62 +2,66 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#include "../common/cbasetypes.h"
-#include "../common/core.h"
-#include "../common/timer.h"
-#include "../common/ers.h"
-#include "../common/grfio.h"
-#include "../common/malloc.h"
-#include "../common/socket.h" // WFIFO*()
-#include "../common/showmsg.h"
-#include "../common/nullpo.h"
-#include "../common/random.h"
-#include "../common/strlib.h"
-#include "../common/utils.h"
-#include "../common/conf.h"
-#include "../common/console.h"
-#include "../common/HPM.h"
+#define HERCULES_CORE
 
+#include "../config/core.h" // CELL_NOSTACK, CIRCULAR_AREA, CONSOLE_INPUT, DBPATH, RENEWAL
 #include "map.h"
-#include "path.h"
-#include "chrif.h"
-#include "clif.h"
-#include "duel.h"
-#include "intif.h"
-#include "npc.h"
-#include "pc.h"
-#include "status.h"
-#include "mob.h"
-#include "npc.h" // npc_setcells(), npc_unsetcells()
-#include "chat.h"
-#include "itemdb.h"
-#include "storage.h"
-#include "skill.h"
-#include "trade.h"
-#include "party.h"
-#include "unit.h"
-#include "battle.h"
-#include "battleground.h"
-#include "quest.h"
-#include "script.h"
-#include "mapreg.h"
-#include "guild.h"
-#include "pet.h"
-#include "homunculus.h"
-#include "instance.h"
-#include "mercenary.h"
-#include "elemental.h"
-#include "atcommand.h"
-#include "log.h"
-#include "mail.h"
-#include "irc-bot.h"
-#include "HPMmap.h"
 
+#include <math.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdarg.h>
-#include <math.h>
+
+#include "HPMmap.h"
+#include "atcommand.h"
+#include "battle.h"
+#include "battleground.h"
+#include "chat.h"
+#include "chrif.h"
+#include "clif.h"
+#include "duel.h"
+#include "elemental.h"
+#include "guild.h"
+#include "homunculus.h"
+#include "instance.h"
+#include "intif.h"
+#include "irc-bot.h"
+#include "itemdb.h"
+#include "log.h"
+#include "mail.h"
+#include "mapreg.h"
+#include "mercenary.h"
+#include "mob.h"
+#include "npc.h"
+#include "npc.h" // npc_setcells(), npc_unsetcells()
+#include "party.h"
+#include "path.h"
+#include "pc.h"
+#include "pet.h"
+#include "quest.h"
+#include "script.h"
+#include "skill.h"
+#include "status.h"
+#include "storage.h"
+#include "trade.h"
+#include "unit.h"
+#include "../common/HPM.h"
+#include "../common/cbasetypes.h"
+#include "../common/conf.h"
+#include "../common/console.h"
+#include "../common/core.h"
+#include "../common/ers.h"
+#include "../common/grfio.h"
+#include "../common/malloc.h"
+#include "../common/nullpo.h"
+#include "../common/random.h"
+#include "../common/showmsg.h"
+#include "../common/socket.h" // WFIFO*()
+#include "../common/strlib.h"
+#include "../common/timer.h"
+#include "../common/utils.h"
+
 #ifndef _WIN32
 #include <unistd.h>
 #endif
@@ -163,31 +167,32 @@ int map_freeblock_timer(int tid, int64 tick, int id, intptr_t data) {
 	return 0;
 }
 
-/*==========================================
- * These pair of functions update the counter of how many objects
- * lie on a tile.
- *------------------------------------------*/
-void map_addblcell(struct block_list *bl) {
+/**
+ * Updates the counter (cell.cell_bl) of how many objects are on a tile.
+ * @param add Whether the counter should be increased or decreased
+ **/
+void map_update_cell_bl( struct block_list *bl, bool increase ) {
 #ifdef CELL_NOSTACK
+	int pos;
+
 	if( bl->m < 0 || bl->x < 0 || bl->x >= map->list[bl->m].xs
 	              || bl->y < 0 || bl->y >= map->list[bl->m].ys
 	              || !(bl->type&BL_CHAR) )
 		return;
-	map->list[bl->m].cell[bl->x+bl->y*map->list[bl->m].xs].cell_bl++;
-#else
-	return;
-#endif
-}
 
-void map_delblcell(struct block_list *bl) {
-#ifdef CELL_NOSTACK
-	if( bl->m < 0 || bl->x < 0 || bl->x >= map->list[bl->m].xs
-	              || bl->y < 0 || bl->y >= map->list[bl->m].ys
-	              || !(bl->type&BL_CHAR) )
-	map->list[bl->m].cell[bl->x+bl->y*map->list[bl->m].xs].cell_bl--;
-#else
-	return;
+	// When reading from mapcache the cell isn't initialized
+	// TODO: Maybe start initializing cells when they're loaded instead of
+	// having to get them here? [Panikon]
+	if( map->list[bl->m].cell == (struct mapcell *)0xdeadbeaf )
+		map->cellfromcache(&map->list[bl->m]);
+
+	pos = bl->x + bl->y*map->list[bl->m].xs;
+	if( increase )
+		map->list[bl->m].cell[pos].cell_bl++;
+	else
+		map->list[bl->m].cell[pos].cell_bl--;
 #endif
+	return;
 }
 
 /*==========================================
@@ -233,7 +238,7 @@ int map_addblock(struct block_list* bl)
 	}
 
 #ifdef CELL_NOSTACK
-	map->addblcell(bl);
+	map->update_cell_bl(bl, true);
 #endif
 
 	return 0;
@@ -250,14 +255,14 @@ int map_delblock(struct block_list* bl)
 	// blocklist (2ways chainlist)
 	if (bl->prev == NULL) {
 		if (bl->next != NULL) {
-			// can't delete block (already at the begining of the chain)
+			// can't delete block (already at the beginning of the chain)
 			ShowError("map_delblock error : bl->next!=NULL\n");
 		}
 		return 0;
 	}
 
 #ifdef CELL_NOSTACK
-	map->delblcell(bl);
+	map->update_cell_bl(bl, false);
 #endif
 
 	pos = bl->x/BLOCK_SIZE+(bl->y/BLOCK_SIZE)*map->list[bl->m].bxs;
@@ -315,13 +320,13 @@ int map_moveblock(struct block_list *bl, int x1, int y1, int64 tick) {
 
 	if (moveblock) map->delblock(bl);
 #ifdef CELL_NOSTACK
-	else map->delblcell(bl);
+	else map->update_cell_bl(bl, false);
 #endif
 	bl->x = x1;
 	bl->y = y1;
 	if (moveblock) map->addblock(bl);
 #ifdef CELL_NOSTACK
-	else map->addblcell(bl);
+	else map->update_cell_bl(bl, true);
 #endif
 
 	if (bl->type&BL_CHAR) {
@@ -464,7 +469,7 @@ static int bl_vforeach(int (*func)(struct block_list*, va_list), int blockcount,
 
 	map->freeblock_lock();
 	for (i = blockcount; i < map->bl_list_count && returnCount < max; i++) {
-		if (map->bl_list[i]->prev) { //func() may delete this bl_list[] slot, checking for prev ensures it wasnt queued for deletion.
+		if (map->bl_list[i]->prev) { //func() may delete this bl_list[] slot, checking for prev ensures it wasn't queued for deletion.
 			va_list argscopy;
 			va_copy(argscopy, args);
 			returnCount += func(map->bl_list[i], argscopy);
@@ -490,7 +495,7 @@ static int bl_vforeach(int (*func)(struct block_list*, va_list), int blockcount,
 static int map_vforeachinmap(int (*func)(struct block_list*, va_list), int16 m, int type, va_list args) {
 	int i;
 	int returnCount = 0;
-	int bsize; 
+	int bsize;
 	va_list argscopy;
 	struct block_list *bl;
 	int blockcount = map->bl_list_count;
@@ -2033,7 +2038,7 @@ void map_foreachnpc(int (*func)(struct npc_data* nd, va_list args), ...) {
 }
 
 /// Applies func to everything in the db.
-/// Stops iteratin gif func returns -1.
+/// Stops iterating gif func returns -1.
 void map_vforeachregen(int (*func)(struct block_list* bl, va_list args), va_list args) {
 	DBIterator* iter;
 	struct block_list* bl;
@@ -2053,7 +2058,7 @@ void map_vforeachregen(int (*func)(struct block_list* bl, va_list args), va_list
 }
 
 /// Applies func to everything in the db.
-/// Stops iteratin gif func returns -1.
+/// Stops iterating gif func returns -1.
 /// @see map_vforeachregen
 void map_foreachregen(int (*func)(struct block_list* bl, va_list args), ...) {
 	va_list args;
@@ -2408,9 +2413,10 @@ uint8 map_calc_dir(struct block_list* src, int16 x, int16 y)
 	dx = x-src->x;
 	dy = y-src->y;
 	if( dx == 0 && dy == 0 )
-	{	// both are standing on the same spot
-		//dir = 6; // aegis-style, makes knockback default to the left
-		dir = unit->getdir(src); // athena-style, makes knockback default to behind 'src'
+	{	// both are standing on the same spot.
+		// aegis-style, makes knockback default to the left.
+		// athena-style, makes knockback default to behind 'src'.
+		dir = (battle_config.knockback_left ? 6 : unit->getdir(src));
 	}
 	else if( dx >= 0 && dy >=0 )
 	{	// upper-right
@@ -2517,8 +2523,13 @@ void map_cellfromcache(struct map_data *m) {
 		decode_zip(decode_buffer, &size, m->cellPos+sizeof(struct map_cache_map_info), info->len);
 		CREATE(m->cell, struct mapcell, size);
 
-		for( xy = 0; xy < size; ++xy )
+		// Set cell properties
+		for( xy = 0; xy < size; ++xy ) {
 			m->cell[xy] = map->gat2cell(decode_buffer[xy]);
+#ifdef CELL_NOSTACK
+			m->cell[xy].cell_bl = 0;
+#endif
+		}
 
 		m->getcellp = map->getcellp;
 		m->setcell  = map->setcell;
@@ -2846,6 +2857,7 @@ int map_eraseipport(unsigned short map_index, uint32 ip, uint16 port) {
  * [Shinryo]: Init the mapcache
  *------------------------------------------*/
 char *map_init_mapcache(FILE *fp) {
+	struct map_cache_main_header header;
 	size_t size = 0;
 	char *buffer;
 
@@ -2866,6 +2878,21 @@ char *map_init_mapcache(FILE *fp) {
 	// Read file into buffer..
 	if(fread(buffer, sizeof(char), size, fp) != size) {
 		ShowError("map_init_mapcache: Could not read entire mapcache file\n");
+		aFree(buffer);
+		return NULL;
+	}
+
+	rewind(fp);
+
+	// Get main header to verify if data is corrupted
+	if( fread(&header, sizeof(header), 1, fp) != 1 ) {
+		ShowError("map_init_mapcache: Error obtaining main header!\n");
+		aFree(buffer);
+		return NULL;
+	}
+	if( GetULong((unsigned char *)&(header.file_size)) != size ) {
+		ShowError("map_init_mapcache: Map cache is corrupted!\n");
+		aFree(buffer);
 		return NULL;
 	}
 
@@ -3227,13 +3254,13 @@ int map_waterheight(char* mapname)
 
 	// read & convert fn
 	rsw = (char *) grfio_read (fn);
-	if (rsw)
-	{	//Load water height from file
+	if (rsw) {
+		//Load water height from file
 		int wh = (int) *(float*)(rsw+166);
 		aFree(rsw);
 		return wh;
 	}
-	ShowWarning("Failed to find water level for (%s)\n", mapname, fn);
+	ShowWarning("Failed to find water level for %s (%s)\n", mapname, fn);
 	return NO_WATER;
 }
 
@@ -3273,6 +3300,9 @@ int map_readgat (struct map_data* m)
 			type = 3; // Cell is 0 (walkable) but under water level, set to 3 (walkable water)
 
 		m->cell[xy] = map->gat2cell(type);
+#ifdef CELL_NOSTACK
+		m->cell[xy].cell_bl = 0;
+#endif
 	}
 
 	aFree(gat);
@@ -3398,14 +3428,14 @@ int map_config_read(char *cfgName) {
 		return 1;
 	}
 
-	while( fgets(line, sizeof(line), fp) ) {
+	while (fgets(line, sizeof(line), fp)) {
 		char* ptr;
 
-		if( line[0] == '/' && line[1] == '/' )
+		if (line[0] == '/' && line[1] == '/')
 			continue;
-		if( (ptr = strstr(line, "//")) != NULL )
+		if ((ptr = strstr(line, "//")) != NULL)
 			*ptr = '\n'; //Strip comments
-		if( sscanf(line, "%[^:]: %[^\t\r\n]", w1, w2) < 2 )
+		if (sscanf(line, "%1023[^:]: %1023[^\t\r\n]", w1, w2) < 2)
 			continue;
 
 		//Strip trailing spaces
@@ -3485,19 +3515,19 @@ int map_config_read_sub(char *cfgName) {
 	FILE *fp;
 
 	fp = fopen(cfgName,"r");
-	if( fp == NULL ) {
+	if (fp == NULL) {
 		ShowError("Map configuration file not found at: %s\n", cfgName);
 		return 1;
 	}
 
-	while( fgets(line, sizeof(line), fp) ) {
+	while (fgets(line, sizeof(line), fp)) {
 		char* ptr;
 
-		if( line[0] == '/' && line[1] == '/' )
+		if (line[0] == '/' && line[1] == '/')
 			continue;
-		if( (ptr = strstr(line, "//")) != NULL )
+		if ((ptr = strstr(line, "//")) != NULL)
 			*ptr = '\n'; //Strip comments
-		if( sscanf(line, "%[^:]: %[^\t\r\n]", w1, w2) < 2 )
+		if (sscanf(line, "%1023[^:]: %1023[^\t\r\n]", w1, w2) < 2)
 			continue;
 
 		//Strip trailing spaces
@@ -3517,27 +3547,24 @@ int map_config_read_sub(char *cfgName) {
 	fclose(fp);
 	return 0;
 }
-void map_reloadnpc_sub(char *cfgName)
-{
+void map_reloadnpc_sub(char *cfgName) {
 	char line[1024], w1[1024], w2[1024];
 	FILE *fp;
 
 	fp = fopen(cfgName,"r");
-	if( fp == NULL )
-	{
+	if (fp == NULL) {
 		ShowError("Map configuration file not found at: %s\n", cfgName);
 		return;
 	}
 
-	while( fgets(line, sizeof(line), fp) )
-	{
+	while (fgets(line, sizeof(line), fp)) {
 		char* ptr;
 
-		if( line[0] == '/' && line[1] == '/' )
+		if (line[0] == '/' && line[1] == '/')
 			continue;
-		if( (ptr = strstr(line, "//")) != NULL )
+		if ((ptr = strstr(line, "//")) != NULL)
 			*ptr = '\n'; //Strip comments
-		if( sscanf(line, "%[^:]: %[^\t\r\n]", w1, w2) < 2 )
+		if (sscanf(line, "%1023[^:]: %1023[^\t\r\n]", w1, w2) < 2)
 			continue;
 
 		//Strip trailing spaces
@@ -3580,15 +3607,15 @@ int inter_config_read(char *cfgName) {
 	char line[1024],w1[1024],w2[1024];
 	FILE *fp;
 
-	if( !( fp = fopen(cfgName,"r") ) ){
+	if (!(fp = fopen(cfgName,"r"))) {
 		ShowError("File not found: %s\n",cfgName);
 		return 1;
 	}
-	while(fgets(line, sizeof(line), fp)) {
-		if(line[0] == '/' && line[1] == '/')
+	while (fgets(line, sizeof(line), fp)) {
+		if (line[0] == '/' && line[1] == '/')
 			continue;
 		
-		if( sscanf(line,"%[^:]: %[^\r\n]",w1,w2) < 2 )
+		if (sscanf(line,"%1023[^:]: %1023[^\r\n]", w1, w2) < 2)
 			continue;
 		/* table names */
 		if(strcmpi(w1,"item_db_db")==0)
@@ -3636,6 +3663,8 @@ int inter_config_read(char *cfgName) {
 			strcpy(map->autotrade_merchants_db, w2);
 		else if(strcmpi(w1,"autotrade_data_db")==0)
 			strcpy(map->autotrade_data_db, w2);
+		else if(strcmpi(w1,"npc_market_data_db")==0)
+			strcpy(map->npc_market_data_db, w2);
 		/* sql log db */
 		else if(strcmpi(w1,"log_db_ip")==0)
 			strcpy(logs->db_ip, w2);
@@ -3825,7 +3854,7 @@ void map_zone_remove(int m) {
 			}
 		}
 
-		npc->parse_mapflag(map->list[m].name,empty,flag,params,empty,empty,empty);
+		npc->parse_mapflag(map->list[m].name,empty,flag,params,empty,empty,empty, NULL);
 		aFree(map->list[m].zone_mf[k]);
 		map->list[m].zone_mf[k] = NULL;
 	}
@@ -4009,7 +4038,7 @@ bool map_zone_mf_cache(int m, char *flag, char *params) {
 #if 0 /* not yet fully supported */
 		char drop_arg1[16], drop_arg2[16];
 		int drop_per = 0;
-		if (sscanf(w4, "%[^,],%[^,],%d", drop_arg1, drop_arg2, &drop_per) == 3) {
+		if (sscanf(w4, "%15[^,],%15[^,],%d", drop_arg1, drop_arg2, &drop_per) == 3) {
 			int drop_id = 0, drop_type = 0;
 			if (!strcmpi(drop_arg1, "random"))
 				drop_id = -1;
@@ -4380,7 +4409,7 @@ bool map_zone_mf_cache(int m, char *flag, char *params) {
 		}
 
 		if( modifier[0] == '\0' || !( skill_id = skill->name2id(skill_name) ) || !skill->get_unit_id( skill->name2id(skill_name), 0) || atoi(modifier) < 1 || atoi(modifier) > USHRT_MAX ) {
-			;/* we dont mind it, the server will take care of it next. */
+			;/* we don't mind it, the server will take care of it next. */
 		} else {
 			int idx = map->list[m].unit_count;
 
@@ -4413,7 +4442,7 @@ bool map_zone_mf_cache(int m, char *flag, char *params) {
 		}
 
 		if( modifier[0] == '\0' || !( skill_id = skill->name2id(skill_name) ) || atoi(modifier) < 1 || atoi(modifier) > USHRT_MAX ) {
-			;/* we dont mind it, the server will take care of it next. */
+			;/* we don't mind it, the server will take care of it next. */
 		} else {
 			int idx = map->list[m].skill_count;
 
@@ -4557,7 +4586,7 @@ void map_zone_apply(int m, struct map_zone_data *zone, const char* start, const 
 		if( map->zone_mf_cache(m,flag,params) )
 			continue;
 
-		npc->parse_mapflag(map->list[m].name,empty,flag,params,start,buffer,filepath);
+		npc->parse_mapflag(map->list[m].name, empty, flag, params, start, buffer, filepath, NULL);
 	}
 }
 /* used on npc load and reload to apply all "Normal" and "PK Mode" zones */
@@ -4585,7 +4614,7 @@ void map_zone_init(void) {
 			if( map->list[j].zone == zone ) {
 				if( map->zone_mf_cache(j,flag,params) )
 					break;
-				npc->parse_mapflag(map->list[j].name,empty,flag,params,empty,empty,empty);
+				npc->parse_mapflag(map->list[j].name, empty, flag, params, empty, empty, empty, NULL);
 			}
 		}
 	}
@@ -4607,7 +4636,7 @@ void map_zone_init(void) {
 				if( map->list[j].zone == zone ) {
 					if( map->zone_mf_cache(j,flag,params) )
 						break;
-					npc->parse_mapflag(map->list[j].name,empty,flag,params,empty,empty,empty);
+					npc->parse_mapflag(map->list[j].name, empty, flag, params, empty, empty, empty, NULL);
 				}
 			}
 		}
@@ -4770,7 +4799,7 @@ void read_map_zone_db(void) {
 						--h;
 						continue;
 					}
-					if( !map->zone_bl_type(libconfig->setting_get_string_elem(skills,h),&subtype) )/* we dont remove it from the three due to inheritance */
+					if( !map->zone_bl_type(libconfig->setting_get_string_elem(skills,h),&subtype) )/* we don't remove it from the three due to inheritance */
 						--disabled_skills_count;
 				}
 				/* all ok, process */
@@ -4808,7 +4837,7 @@ void read_map_zone_db(void) {
 						--h;
 						continue;
 					}
-					if( !libconfig->setting_get_bool(item) )/* we dont remove it from the three due to inheritance */
+					if( !libconfig->setting_get_bool(item) )/* we don't remove it from the three due to inheritance */
 						--disabled_items_count;
 				}
 				/* all ok, process */
@@ -4853,7 +4882,7 @@ void read_map_zone_db(void) {
 						--h;
 						continue;
 					}
-					if( !libconfig->setting_get_int(command) )/* we dont remove it from the three due to inheritance */
+					if( !libconfig->setting_get_int(command) )/* we don't remove it from the three due to inheritance */
 						--disabled_commands_count;
 				}
 				/* all ok, process */
@@ -4889,7 +4918,7 @@ void read_map_zone_db(void) {
 						--h;
 						continue;
 					}
-					if( !map->zone_bl_type(libconfig->setting_get_string_elem(cap,1),&subtype) )/* we dont remove it from the three due to inheritance */
+					if( !map->zone_bl_type(libconfig->setting_get_string_elem(cap,1),&subtype) )/* we don't remove it from the three due to inheritance */
 						--capped_skills_count;
 				}
 				/* all ok, process */
@@ -5212,8 +5241,7 @@ int cleanup_db_sub(DBKey key, DBData *data, va_list va) {
 /*==========================================
  * map destructor
  *------------------------------------------*/
-void do_final(void)
-{
+int do_final(void) {
 	int i;
 	struct map_session_data* sd;
 	struct s_mapiterator* iter;
@@ -5308,6 +5336,7 @@ void do_final(void)
 	HPM->event(HPET_POST_FINAL);
 	
 	ShowStatus("Finished.\n");
+	return map->retval;
 }
 
 int map_abort_sub(struct map_session_data* sd, va_list ap) {
@@ -5464,8 +5493,8 @@ void map_cp_defaults(void) {
 	map->cpsd->bl.y = MAP_DEFAULT_Y;
 	map->cpsd->bl.m = map->mapname2mapid(MAP_DEFAULT);
 
-	console->addCommand("gm:info",CPCMD_A(gm_position));
-	console->addCommand("gm:use",CPCMD_A(gm_use));
+	console->input->addCommand("gm:info",CPCMD_A(gm_position));
+	console->input->addCommand("gm:use",CPCMD_A(gm_use));
 #endif
 }
 /* Hercules Plugin Mananger */
@@ -5690,7 +5719,7 @@ int do_init(int argc, char *argv[])
 			char ip_str[16];
 			ip2str(sockt->addr_[0], ip_str);
 
-			ShowWarning("Not all IP addresses in /conf/map-server.conf configured, autodetecting...\n");
+			ShowWarning("Not all IP addresses in /conf/map-server.conf configured, auto-detecting...\n");
 
 			if (sockt->naddr_ == 0)
 				ShowError("Unable to determine your IP address...\n");
@@ -5714,7 +5743,7 @@ int do_init(int argc, char *argv[])
 
 	map->id_db     = idb_alloc(DB_OPT_BASE);
 	map->pc_db     = idb_alloc(DB_OPT_BASE); //Added for reliable map->id2sd() use. [Skotlex]
-	map->mobid_db  = idb_alloc(DB_OPT_BASE); //Added to lower the load of the lazy mob ai. [Skotlex]
+	map->mobid_db  = idb_alloc(DB_OPT_BASE); //Added to lower the load of the lazy mob AI. [Skotlex]
 	map->bossid_db = idb_alloc(DB_OPT_BASE); // Used for Convex Mirror quick MVP search
 	map->map_db    = uidb_alloc(DB_OPT_BASE);
 	map->nick_db   = idb_alloc(DB_OPT_BASE);
@@ -5773,7 +5802,7 @@ int do_init(int argc, char *argv[])
 	itemdb->init(minimal);
 	skill->init(minimal);
 	if (!minimal)
-		map->read_zone_db();/* read after item and skill initalization */
+		map->read_zone_db();/* read after item and skill initialization */
 	mob->init(minimal);
 	pc->init(minimal);
 	status->init(minimal);
@@ -5794,7 +5823,7 @@ int do_init(int argc, char *argv[])
 	if (scriptcheck) {
 		bool failed = load_extras_count > 0 ? false : true;
 		for (i = 0; i < load_extras_count; i++) {
-			if (npc->parsesrcfile(load_extras[i], false) != 0)
+			if (npc->parsesrcfile(load_extras[i], false) != EXIT_SUCCESS)
 				failed = true;
 		}
 		if (failed)
@@ -5812,7 +5841,7 @@ int do_init(int argc, char *argv[])
 		exit(EXIT_SUCCESS);
 	}
 	
-	npc->event_do_oninit();	// Init npcs (OnInit)
+	npc->event_do_oninit( false );	// Init npcs (OnInit)
 	npc->market_fromsql(); /* after OnInit */
 	
 	if (battle_config.pk_mode)
@@ -5821,7 +5850,7 @@ int do_init(int argc, char *argv[])
 	Sql_HerculesUpdateCheck(map->mysql_handle);
 	
 #ifdef CONSOLE_INPUT
-	console->setSQL(map->mysql_handle);
+	console->input->setSQL(map->mysql_handle);
 #endif
 	
 	ShowStatus("Server is '"CL_GREEN"ready"CL_RESET"' and listening on port '"CL_WHITE"%d"CL_RESET"'.\n\n", map->port);
@@ -5839,7 +5868,7 @@ int do_init(int argc, char *argv[])
 }
 
 /*=====================================
-* Default Functions : map.h 
+* Default Functions : map.h
 * Generated by HerculesInterfaceMaker
 * created by Susu
 *-------------------------------------*/
@@ -5849,6 +5878,7 @@ void map_defaults(void) {
 	/* */
 	map->minimal = false;
 	map->count = 0;
+	map->retval = EXIT_SUCCESS;
 	
 	sprintf(map->db_path ,"db");
 	sprintf(map->help_txt ,"conf/help.txt");
@@ -6103,8 +6133,7 @@ void map_defaults(void) {
 	map->versionscreen = map_versionscreen;
 	map->arg_next_value = map_arg_next_value;
 
-	map->addblcell = map_addblcell;
-	map->delblcell = map_delblcell;
+	map->update_cell_bl = map_update_cell_bl;
 	
 	map->get_new_bonus_id = map_get_new_bonus_id;
 	

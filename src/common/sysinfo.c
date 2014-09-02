@@ -4,23 +4,39 @@
 
 /// See sysinfo.h for a description of this file
 
-#define _COMMON_SYSINFO_P_
+#define HERCULES_CORE
+
 #include "sysinfo.h"
-#undef _COMMON_SYSINFO_P_
+
+#include <stdio.h> // fopen
+#include <stdlib.h> // atoi
 
 #include "../common/cbasetypes.h"
 #include "../common/core.h"
-#include "../common/strlib.h"
 #include "../common/malloc.h"
+#include "../common/strlib.h"
 
 #ifdef WIN32
-#include <windows.h>
-#include <string.h> // strlen
+#	include <string.h> // strlen
+#	include <windows.h>
 #else
-#include <unistd.h>
+#	include <unistd.h>
 #endif
-#include <stdio.h> // fopen
-#include <stdlib.h> // atoi
+
+/// Private interface fields
+struct sysinfo_private {
+	char *platform;
+	char *osversion;
+	char *cpu;
+	int cpucores;
+	char *arch;
+	char *compiler;
+	char *cflags;
+	char *vcstype_name;
+	int vcstype;
+	char *vcsrevision_src;
+	char *vcsrevision_scripts;
+};
 
 /// sysinfo.c interface source
 struct sysinfo_interface sysinfo_s;
@@ -210,7 +226,7 @@ bool sysinfo_svn_get_revision(char **out) {
 	// - since it's a cache column, the data might not even exist
 	if ((fp = fopen(".svn"PATHSEP_STR"wc.db", "rb")) != NULL || (fp = fopen(".."PATHSEP_STR".svn"PATHSEP_STR"wc.db", "rb")) != NULL) {
 
-#ifndef SVNNODEPATH //not sure how to handle branches, so i'll leave this overridable define until a better solution comes up
+#ifndef SVNNODEPATH //not sure how to handle branches, so I'll leave this overridable define until a better solution comes up
 #define SVNNODEPATH trunk
 #endif // SVNNODEPATH
 
@@ -591,6 +607,37 @@ void sysinfo_osversion_retrieve(void) {
 }
 
 typedef void (WINAPI *PGNSI)(LPSYSTEM_INFO);
+
+/**
+ * Retrieves SYSTEM_INFO (Windows only)
+ * System info is not stored anywhere after retrieval
+ * @see http://msdn.microsoft.com/en-us/library/windows/desktop/ms724958(v=vs.85).aspx
+ **/
+void sysinfo_systeminfo_retrieve( LPSYSTEM_INFO info ) {
+	PGNSI pGNSI;
+
+	// Call GetNativeSystemInfo if supported or GetSystemInfo otherwise.
+	pGNSI = (PGNSI) GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")), "GetNativeSystemInfo");
+	if (NULL != pGNSI)
+		pGNSI(info);
+	else
+		GetSystemInfo(info);
+
+	return;
+}
+
+/**
+ * Returns number of bytes in a memory page
+ * Only needed when compiling with MSVC
+ **/
+long sysinfo_getpagesize( void ) {
+	SYSTEM_INFO si;
+	ZeroMemory(&si, sizeof(SYSTEM_INFO));
+
+	sysinfo_systeminfo_retrieve(&si);
+	return si.dwPageSize;
+}
+
 /**
  * Retrieves the CPU type (Windows only).
  *
@@ -599,7 +646,6 @@ typedef void (WINAPI *PGNSI)(LPSYSTEM_INFO);
  */
 void sysinfo_cpu_retrieve(void) {
 	StringBuf buf;
-	PGNSI pGNSI;
 	SYSTEM_INFO si;
 	ZeroMemory(&si, sizeof(SYSTEM_INFO));
 	StrBuf->Init(&buf);
@@ -609,12 +655,7 @@ void sysinfo_cpu_retrieve(void) {
 		sysinfo->p->cpu = NULL;
 	}
 
-	// Call GetNativeSystemInfo if supported or GetSystemInfo otherwise.
-	pGNSI = (PGNSI) GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")), "GetNativeSystemInfo");
-	if (NULL != pGNSI)
-		pGNSI(&si);
-	else
-		GetSystemInfo(&si);
+	sysinfo_systeminfo_retrieve(&si);
 
 	if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL
 	 || si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64
@@ -640,7 +681,6 @@ void sysinfo_cpu_retrieve(void) {
  * Once retrieved, the name is stored into sysinfo->p->arch.
  */
 void sysinfo_arch_retrieve(void) {
-	PGNSI pGNSI;
 	SYSTEM_INFO si;
 	ZeroMemory(&si, sizeof(SYSTEM_INFO));
 
@@ -649,12 +689,7 @@ void sysinfo_arch_retrieve(void) {
 		sysinfo->p->arch = NULL;
 	}
 
-	// Call GetNativeSystemInfo if supported or GetSystemInfo otherwise.
-	pGNSI = (PGNSI) GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")), "GetNativeSystemInfo");
-	if (NULL != pGNSI)
-		pGNSI(&si);
-	else
-		GetSystemInfo(&si);
+	sysinfo_systeminfo_retrieve(&si);
 
 	if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64) // x64
 		sysinfo->p->arch = aStrdup("x86_64");
@@ -693,7 +728,7 @@ void sysinfo_vcsrevision_src_retrieve(void) {
 #endif // WIN32
 
 /**
- * Retrieevs the VCS type name.
+ * Retrieves the VCS type name.
  *
  * Once retrieved, the value is stored in sysinfo->p->vcstype_name.
  */
@@ -1002,7 +1037,11 @@ void sysinfo_defaults(void) {
 	sysinfo = &sysinfo_s;
 	memset(&sysinfo_p, '\0', sizeof(sysinfo_p));
 	sysinfo->p = &sysinfo_p;
-
+#if defined(WIN32) && !defined(__CYGWIN__)
+	sysinfo->getpagesize = sysinfo_getpagesize;
+#else
+	sysinfo->getpagesize = getpagesize;
+#endif
 	sysinfo->platform = sysinfo_platform;
 	sysinfo->osversion = sysinfo_osversion;
 	sysinfo->cpu = sysinfo_cpu;

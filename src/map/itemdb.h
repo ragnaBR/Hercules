@@ -2,12 +2,15 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#ifndef _MAP_ITEMDB_H_
-#define _MAP_ITEMDB_H_
+#ifndef MAP_ITEMDB_H
+#define MAP_ITEMDB_H
 
+#include "map.h"
+#include "../common/cbasetypes.h"
+#include "../common/conf.h"
 #include "../common/db.h"
 #include "../common/mmo.h" // ITEM_NAME_LENGTH
-#include "map.h"
+#include "../common/sql.h"
 
 /**
  * Declarations
@@ -57,6 +60,10 @@ enum item_itemid {
 	ITEMID_ORIDECON_STONE        = 756,
 	ITEMID_ALCHOL                = 970,
 	ITEMID_ORIDECON              = 984,
+	ITEMID_ANVIL                 = 986,
+	ITEMID_ORIDECON_ANVIL        = 987,
+	ITEMID_GOLDEN_ANVIL          = 988,
+	ITEMID_EMPERIUM_ANVIL        = 989,
 	ITEMID_BOODY_RED             = 990,
 	ITEMID_CRYSTAL_BLUE          = 991,
 	ITEMID_WIND_OF_VERDURE       = 992,
@@ -318,10 +325,6 @@ enum geneticist_item_list {
 	ITEMID_BLACK_THING_TO_THROW,   // 13290
 };
 
-enum item_nouse_list {
-	NOUSE_SITTING = 0x01,
-};
-
 //
 enum e_chain_cache {
 	ECC_ORE,
@@ -338,6 +341,34 @@ enum item_class_upper {
 	ITEMUPPER_THURDUPPER = 0x10,
 	ITEMUPPER_THIRDBABY  = 0x20,
 	ITEMUPPER_ALL        = 0x3f, // Sum of all the above
+};
+
+/**
+ * Item Trade restrictions
+ */
+enum ItemTradeRestrictions {
+	ITR_NONE            = 0x000, ///< No restrictions
+	ITR_NODROP          = 0x001, ///< Item can't be dropped
+	ITR_NOTRADE         = 0x002, ///< Item can't be traded (nor vended)
+	ITR_PARTNEROVERRIDE = 0x004, ///< Wedded partner can override ITR_NOTRADE restriction
+	ITR_NOSELLTONPC     = 0x008, ///< Item can't be sold to NPCs
+	ITR_NOCART          = 0x010, ///< Item can't be placed in the cart
+	ITR_NOSTORAGE       = 0x020, ///< Item can't be placed in the storage
+	ITR_NOGSTORAGE      = 0x040, ///< Item can't be placed in the guild storage
+	ITR_NOMAIL          = 0x080, ///< Item can't be attached to mail messages
+	ITR_NOAUCTION       = 0x100, ///< Item can't be auctioned
+
+	ITR_ALL             = 0x1ff  ///< Sum of all the above values
+};
+
+/**
+ * Iten No-use restrictions
+ */
+enum ItemNouseRestrictions {
+	INR_NONE    = 0x0, ///< No restrictions
+	INR_SITTING = 0x1, ///< Item can't be used while sitting
+
+	INR_ALL     = 0x1 ///< Sum of all the above values
 };
 
 struct item_data {
@@ -379,7 +410,7 @@ struct item_data {
 		unsigned available : 1;
 		unsigned no_refine : 1;	// [celest]
 		unsigned delay_consume : 1;	// Signifies items that are not consumed immediately upon double-click [Skotlex]
-		unsigned trade_restriction : 9;	//Item restrictions mask [Skotlex]
+		unsigned trade_restriction : 9;	///< Item trade restrictions mask (@see enum ItemTradeRestrictions)
 		unsigned autoequip: 1;
 		unsigned buyingstore : 1;
 		unsigned bindonequip : 1;
@@ -391,8 +422,8 @@ struct item_data {
 		unsigned int storage:1;
 		unsigned int guildstorage:1;
 	} stack;
-	struct {// used by item_nouse.txt
-		unsigned int flag;
+	struct {
+		unsigned int flag; ///< Item nouse restriction mask (@see enum ItemNouseRestrictions)
 		unsigned short override;
 	} item_usage;
 	short gm_lv_trade_override;	//GM-level to override trade_restriction
@@ -564,12 +595,6 @@ struct itemdb_interface {
 	int (*isrestricted) (struct item *item, int gmlv, int gmlv2, int(*func)(struct item_data *, int, int));
 	int (*isidentified) (int nameid);
 	int (*isidentified2) (struct item_data *data);
-	bool (*read_itemavail) (char *str[], int columns, int current);
-	bool (*read_itemtrade) (char *str[], int columns, int current);
-	bool (*read_itemdelay) (char *str[], int columns, int current);
-	bool (*read_stack) (char *fields[], int columns, int current);
-	bool (*read_buyingstore) (char *fields[], int columns, int current);
-	bool (*read_nouse) (char *fields[], int columns, int current);
 	int (*combo_split_atoi) (char *str, int *val);
 	void (*read_combos) ();
 	int (*gendercheck) (struct item_data *id);
@@ -590,4 +615,4 @@ struct itemdb_interface *itemdb;
 
 void itemdb_defaults(void);
 
-#endif /* _MAP_ITEMDB_H_ */
+#endif /* MAP_ITEMDB_H */

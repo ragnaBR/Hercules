@@ -2,26 +2,26 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#ifndef _MAP_PC_H_
-#define _MAP_PC_H_
+#ifndef MAP_PC_H
+#define MAP_PC_H
 
-#include "../common/mmo.h" // JOB_*, MAX_FAME_LIST, struct fame_list, struct mmo_charstatus
-#include "../common/ers.h"
-#include "../common/timer.h" // INVALID_TIMER
-#include "atcommand.h" // AtCommandType
-#include "battle.h" // battle_config
-#include "battleground.h"
+#include "../config/core.h" // AUTOLOOTITEM_SIZE, RENEWAL, SECURE_NPCTIMEOUT
+
+#include "battle.h" // battle
+#include "battleground.h" // enum bg_queue_types
 #include "buyingstore.h"  // struct s_buyingstore
-#include "itemdb.h"
-#include "log.h"
-#include "map.h" // RC_MAX
-#include "mob.h"
-#include "pc_groups.h"
-#include "script.h" // struct script_reg, struct script_regstr
+#include "itemdb.h" // MAX_ITEMDELAYS
+#include "log.h" // struct e_log_pick_type
+#include "map.h" // RC_MAX, ELE_MAX
+#include "pc_groups.h" // GroupSettings
+#include "script.h" // struct reg_db
 #include "searchstore.h"  // struct s_search_store_info
-#include "status.h" // OPTION_*, struct weapon_atk
-#include "unit.h" // unit_stop_attack(), unit_stop_walking()
+#include "status.h" // enum sc_type, OPTION_*
+#include "unit.h" // struct unit_data, struct view_data
 #include "vending.h" // struct s_vending
+#include "../common/cbasetypes.h"
+#include "../common/ers.h" // struct eri
+#include "../common/mmo.h" // JOB_*, MAX_FAME_LIST, struct fame_list, struct mmo_charstatus, NEW_CARTS
 
 /**
  * Defines
@@ -319,6 +319,10 @@ struct map_session_data {
 		short flag, rate;
 		unsigned char ele;
 	} subele2[MAX_PC_BONUS];
+	struct {
+		short value;
+		int rate, tick;
+	} def_set_race[RC_MAX], mdef_set_race[RC_MAX];
 	// zeroed structures end here
 	// manually zeroed structures start here.
 	struct s_autobonus autobonus[MAX_PC_BONUS], autobonus2[MAX_PC_BONUS], autobonus3[MAX_PC_BONUS]; //Auto script on attack, when attacked, on skill usage
@@ -352,7 +356,7 @@ struct map_session_data {
 		short add_heal_rate, add_heal2_rate;
 		short sp_gain_value, hp_gain_value, magic_sp_gain_value, magic_hp_gain_value;
 		short sp_vanish_rate;
-		short sp_vanish_per;
+		short sp_vanish_per, sp_vanish_trigger;
 		unsigned short unbreakable;	// chance to prevent ANY equipment breaking [celest]
 		unsigned short unbreakable_equip; //100% break resistance on certain equipment
 		unsigned short unstripable_equip;
@@ -577,7 +581,7 @@ struct map_session_data {
 #define pc_setsit(sd)         ( (sd)->state.dead_sit = (sd)->vd.dead_sit = 2 )
 #define pc_isdead(sd)         ( (sd)->state.dead_sit == 1 )
 #define pc_issit(sd)          ( (sd)->vd.dead_sit == 2 )
-#define pc_isidle(sd)         ( (sd)->chatID || (sd)->state.vending || (sd)->state.buyingstore || DIFF_TICK(sockt->last_tick, (sd)->idletime) >= battle_config.idle_no_share )
+#define pc_isidle(sd)         ( (sd)->chatID || (sd)->state.vending || (sd)->state.buyingstore || DIFF_TICK(sockt->last_tick, (sd)->idletime) >= battle->bc->idle_no_share )
 #define pc_istrading(sd)      ( (sd)->npc_id || (sd)->state.vending || (sd)->state.buyingstore || (sd)->state.trading )
 #define pc_cant_act(sd)       ( (sd)->npc_id || (sd)->state.vending || (sd)->state.buyingstore || (sd)->chatID || ((sd)->sc.opt1 && (sd)->sc.opt1 != OPT1_BURNING) || (sd)->state.trading || (sd)->state.storage_flag || (sd)->state.prevend )
 
@@ -599,9 +603,9 @@ struct map_session_data {
 #define pc_isfalcon(sd)       ( (sd)->sc.option&OPTION_FALCON )
 #define pc_isriding(sd)       ( (sd)->sc.option&OPTION_RIDING )
 #define pc_isinvisible(sd)    ( (sd)->sc.option&OPTION_INVISIBLE )
-#define pc_is50overweight(sd) ( (sd)->weight*100 >= (sd)->max_weight*battle_config.natural_heal_weight_rate )
+#define pc_is50overweight(sd) ( (sd)->weight*100 >= (sd)->max_weight*battle->bc->natural_heal_weight_rate )
 #define pc_is90overweight(sd) ( (sd)->weight*10 >= (sd)->max_weight*9 )
-#define pc_maxparameter(sd)   ( (((sd)->class_&MAPID_UPPERMASK) == MAPID_KAGEROUOBORO || ((sd)->class_&MAPID_UPPERMASK) == MAPID_REBELLION || ((sd)->class_&MAPID_THIRDMASK) == MAPID_SUPER_NOVICE_E) ? battle_config.max_extended_parameter : (sd)->class_&JOBL_THIRD ? ((sd)->class_&JOBL_BABY ? battle_config.max_baby_third_parameter : battle_config.max_third_parameter) : ((sd)->class_&JOBL_BABY ? battle_config.max_baby_parameter : battle_config.max_parameter) )
+#define pc_maxparameter(sd)   ( (((sd)->class_&MAPID_UPPERMASK) == MAPID_KAGEROUOBORO || ((sd)->class_&MAPID_UPPERMASK) == MAPID_REBELLION || ((sd)->class_&MAPID_THIRDMASK) == MAPID_SUPER_NOVICE_E) ? battle->bc->max_extended_parameter : (sd)->class_&JOBL_THIRD ? ((sd)->class_&JOBL_BABY ? battle->bc->max_baby_third_parameter : battle->bc->max_third_parameter) : ((sd)->class_&JOBL_BABY ? battle->bc->max_baby_parameter : battle->bc->max_parameter) )
 /**
  * Ranger
  **/
@@ -737,7 +741,7 @@ struct autotrade_vending {
 };
 
 /*=====================================
-* Interface : pc.h 
+* Interface : pc.h
 * Generated by HerculesInterfaceMaker
 * created by Susu
 *-------------------------------------*/
@@ -754,9 +758,8 @@ struct pc_interface {
 	unsigned int exp_table[CLASS_COUNT][2][MAX_LEVEL];
 	unsigned int max_level[CLASS_COUNT][2];
 	unsigned int statp[MAX_LEVEL+1];
-#if defined(RENEWAL_DROP) || defined(RENEWAL_EXP)
 	unsigned int level_penalty[3][RC_MAX][MAX_LEVEL*2+1];
-#endif
+
 	unsigned int equip_pos[EQI_MAX];
 	/* */
 	struct skill_tree_entry skill_tree[CLASS_COUNT][MAX_SKILL_TREE];
@@ -784,6 +787,8 @@ struct pc_interface {
 	//int (*getrefinebonus) (int lv,int type); FIXME: This function does not exist, nor it is ever called
 	bool (*can_give_items) (struct map_session_data *sd);
 	bool (*can_give_bound_items) (struct map_session_data *sd);
+	bool (*can_talk) (struct map_session_data *sd);
+	bool (*can_attack) ( struct map_session_data *sd, int target_id );
  	
 	bool (*can_use_command) (struct map_session_data *sd, const char *command);
 	int (*set_group) (struct map_session_data *sd, int group_id);
@@ -869,7 +874,7 @@ struct pc_interface {
 	unsigned int (*maxjoblv) (struct map_session_data *sd);
 	int (*checkbaselevelup) (struct map_session_data *sd);
 	int (*checkjoblevelup) (struct map_session_data *sd);
-	int (*gainexp) (struct map_session_data *sd, struct block_list *src, unsigned int base_exp, unsigned int job_exp, bool is_quest);
+	bool (*gainexp) (struct map_session_data *sd, struct block_list *src, unsigned int base_exp, unsigned int job_exp, bool is_quest);
 	unsigned int (*nextbaseexp) (struct map_session_data *sd);
 	unsigned int (*thisbaseexp) (struct map_session_data *sd);
 	unsigned int (*nextjobexp) (struct map_session_data *sd);
@@ -906,7 +911,7 @@ struct pc_interface {
 	int (*setcart) (struct map_session_data* sd, int type);
 	int (*setfalcon) (struct map_session_data* sd, int flag);
 	int (*setriding) (struct map_session_data* sd, int flag);
-	int (*setmadogear) (struct map_session_data* sd, int flag);
+	void (*setmadogear) (struct map_session_data* sd, int flag);
 	int (*changelook) (struct map_session_data *sd,int type,int val);
 	int (*equiplookall) (struct map_session_data *sd);
 	
@@ -1037,4 +1042,4 @@ struct pc_interface *pc;
 
 void pc_defaults(void);
 
-#endif /* _MAP_PC_H_ */
+#endif /* MAP_PC_H */

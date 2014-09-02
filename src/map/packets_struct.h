@@ -3,9 +3,10 @@
 
 /* Hercules Renewal: Phase Two http://hercules.ws/board/topic/383-hercules-renewal-phase-two/ */
 
-#ifndef _MAP_PACKETS_STRUCT_H_
-#define _MAP_PACKETS_STRUCT_H_
+#ifndef MAP_PACKETS_STRUCT_H
+#define MAP_PACKETS_STRUCT_H
 
+#include "../common/cbasetypes.h"
 #include "../common/mmo.h"
 
 /**
@@ -600,7 +601,7 @@ struct packet_status_change {
 #if PACKETVER >= 20120618
 	unsigned int Total;
 #endif
-#if PACKETVER >= 20090121	
+#if PACKETVER >= 20090121
 	unsigned int Left;
 	int val1;
 	int val2;
@@ -951,6 +952,9 @@ struct packet_npc_market_open {
 		unsigned int price;
 		unsigned int qty;
 		unsigned short view;
+	// It seems that the client doesn't have any hard-coded limit for this list
+	// it's possible to send up to 1890 items without dropping a packet that's
+	// too large [Panikon]
 	} list[1000];/* TODO: whats the actual max of this? */
 } __attribute__((packed));
 
@@ -967,4 +971,4 @@ struct packet_wis_end {
 #pragma pack(pop)
 #endif // not NetBSD < 6 / Solaris
 
-#endif /* _MAP_PACKETS_STRUCT_H_ */
+#endif /* MAP_PACKETS_STRUCT_H */

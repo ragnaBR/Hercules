@@ -2,10 +2,14 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#ifndef _MAP_MAIL_H_
-#define _MAP_MAIL_H_
+#ifndef MAP_MAIL_H
+#define MAP_MAIL_H
 
-#include "../common/mmo.h"
+#include "../common/cbasetypes.h"
+
+struct item;
+struct mail_message;
+struct map_session_data;
 
 struct mail_interface {
 	void (*clear) (struct map_session_data *sd);
@@ -23,4 +27,4 @@ struct mail_interface *mail;
 
 void mail_defaults(void);
 
-#endif /* _MAP_MAIL_H_ */
+#endif /* MAP_MAIL_H */

@@ -2,11 +2,17 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#ifndef _MAP_PET_H_
-#define _MAP_PET_H_
+#ifndef MAP_PET_H
+#define MAP_PET_H
 
-#define MAX_PET_DB	300
-#define MAX_PETLOOT_SIZE	30
+#include "map.h" // struct block_list
+#include "status.h" // enum sc_type
+#include "unit.h" // struct unit_data
+#include "../common/cbasetypes.h"
+#include "../common/mmo.h" // NAME_LENGTH, struct s_pet
+
+#define MAX_PET_DB       300
+#define MAX_PETLOOT_SIZE 30
 
 struct s_pet_db {
 	short class_;
@@ -152,4 +158,4 @@ struct pet_interface *pet;
 
 void pet_defaults(void);
 
-#endif /* _MAP_PET_H_ */
+#endif /* MAP_PET_H */

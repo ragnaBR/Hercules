@@ -2,16 +2,19 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#include "../common/mmo.h"
-#include "../common/showmsg.h"
-#include "../common/malloc.h"
-#include "../common/strlib.h"
-#include "../common/db.h"
+#define HERCULES_CORE
+
 #include "mapindex.h"
 
-#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+#include "../common/db.h"
+#include "../common/malloc.h"
+#include "../common/mmo.h"
+#include "../common/showmsg.h"
+#include "../common/strlib.h"
 
 /* mapindex.c interface source */
 struct mapindex_interface mapindex_s;
@@ -46,12 +49,12 @@ const char* mapindex_getmapname_ext(const char* string, char* output) {
 	size_t len;
 
 	strcpy(buf,string);
-	sscanf(string,"%*[^#]%*[#]%s",buf);
+	sscanf(string, "%*[^#]%*[#]%15s", buf);
 
 	len = safestrnlen(buf, MAP_NAME_LENGTH);
 
 	if (len == MAP_NAME_LENGTH) {
-		ShowWarning("(mapindex_normalize_name) Map name '%*s' is too long!\n", 2*MAP_NAME_LENGTH, buf);
+		ShowWarning("(mapindex_normalize_name) Map name '%s' is too long!\n", buf);
 		len--;
 	}
 	safestrncpy(dest, buf, len+1);
@@ -67,7 +70,7 @@ const char* mapindex_getmapname_ext(const char* string, char* output) {
 }
 
 /// Adds a map to the specified index
-/// Returns 1 if successful, 0 oherwise
+/// Returns 1 if successful, 0 otherwise
 int mapindex_addmap(int index, const char* name) {
 	char map_name[MAP_NAME_LENGTH];
 

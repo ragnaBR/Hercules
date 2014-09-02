@@ -2,15 +2,16 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#include "../common/cbasetypes.h"
-#include "../common/malloc.h"
-#include "../common/socket.h"
-#include "../common/timer.h"
-#include "../common/nullpo.h"
-#include "../common/showmsg.h"
-#include "../common/strlib.h"
-#include "../common/ers.h"
-#include "../common/HPM.h"
+#define HERCULES_CORE
+
+#include "../config/core.h" // AUTOTRADE_PERSISTENCY, STATS_OPT_OUT
+#include "chrif.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <time.h>
 
 #include "map.h"
 #include "battle.h"
@@ -25,15 +26,17 @@
 #include "instance.h"
 #include "mercenary.h"
 #include "elemental.h"
-#include "chrif.h"
 #include "quest.h"
 #include "storage.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <time.h>
+#include "../common/HPM.h"
+#include "../common/cbasetypes.h"
+#include "../common/ers.h"
+#include "../common/malloc.h"
+#include "../common/nullpo.h"
+#include "../common/showmsg.h"
+#include "../common/socket.h"
+#include "../common/strlib.h"
+#include "../common/timer.h"
 
 struct chrif_interface chrif_s;
 
@@ -52,7 +55,7 @@ struct chrif_interface chrif_s;
 //2b03: Incoming, clif_charselectok -> '' (i think its the packet after enterworld?) (not sure)
 //2b04: Incoming, chrif_recvmap -> 'getting maps from charserver of other mapserver's'
 //2b05: Outgoing, chrif_changemapserver -> 'Tell the charserver the mapchange / quest for ok...'
-//2b06: Incoming, chrif_changemapserverack -> 'awnser of 2b05, ok/fail, data: dunno^^'
+//2b06: Incoming, chrif_changemapserverack -> 'answer of 2b05, ok/fail, data: dunno^^'
 //2b07: Outgoing, chrif_removefriend -> 'Tell charserver to remove friend_id from char_id friend list'
 //2b08: Outgoing, chrif_searchcharid -> '...'
 //2b09: Incoming, map_addchariddb -> 'Adds a name to the nick db'
@@ -76,7 +79,7 @@ struct chrif_interface chrif_s;
 //2b1b: Incoming, chrif_recvfamelist -> 'Receive fame ranking lists'
 //2b1c: Outgoing, chrif_save_scdata -> 'Send sc_data of player for saving.'
 //2b1d: Incoming, chrif_load_scdata -> 'received sc_data of player for loading.'
-//2b1e: Incoming, chrif_update_ip -> 'Reqest forwarded from char-server for interserver IP sync.' [Lance]
+//2b1e: Incoming, chrif_update_ip -> 'Request forwarded from char-server for interserver IP sync.' [Lance]
 //2b1f: Incoming, chrif_disconnectplayer -> 'disconnects a player (aid X) with the message XY ... 0x81 ..' [Sirius]
 //2b20: Incoming, chrif_removemap -> 'remove maps of a server (sample: its going offline)' [Sirius]
 //2b21: Incoming, chrif_save_ack. Returned after a character has been "final saved" on the char-server. [Skotlex]
@@ -268,7 +271,7 @@ bool chrif_save(struct map_session_data *sd, int flag) {
 	if (flag)
 		sd->state.storage_flag = 0; //Force close it.
 
-	//Saving of registry values. 
+	//Saving of registry values.
 	if (sd->vars_dirty)
 		intif->saveregistry(sd);
 
@@ -288,7 +291,7 @@ bool chrif_save(struct map_session_data *sd, int flag) {
 	if( sd->md && mercenary->get_lifetime(sd->md) > 0 )
 		mercenary->save(sd->md);
 	if( sd->ed && elemental->get_lifetime(sd->ed) > 0 )
-		elemental->save(sd->ed);	
+		elemental->save(sd->ed);
 	if( sd->save_quest )
 		intif->quest_save(sd);
 
@@ -297,7 +300,7 @@ bool chrif_save(struct map_session_data *sd, int flag) {
 
 // connects to char-server (plaintext)
 void chrif_connect(int fd) {
-	ShowStatus("Logging in to char server...\n", chrif->fd);
+	ShowStatus("Logging in to char server...\n");
 	WFIFOHEAD(fd,60);
 	WFIFOW(fd,0) = 0x2af8;
 	memcpy(WFIFOP(fd,2), chrif->userid, NAME_LENGTH);
@@ -390,7 +393,7 @@ bool chrif_changemapserver(struct map_session_data* sd, uint32 ip, uint16 port) 
 	return true;
 }
 
-/// map-server change request acknowledgement (positive or negative)
+/// map-server change request acknowledgment (positive or negative)
 /// R 2b06 <account_id>.L <login_id1>.L <login_id2>.L <char_id>.L <map_index>.W <x>.W <y>.W <ip>.L <port>.W
 bool chrif_changemapserverack(int account_id, int login_id1, int login_id2, int char_id, short map_index, short x, short y, uint32 ip, uint16 port) {
 	struct auth_node *node;
@@ -573,7 +576,7 @@ void chrif_authok(int fd) {
 
 	//Check if both servers agree on the struct's size
 	if( RFIFOW(fd,2) - 25 != sizeof(struct mmo_charstatus) ) {
-		ShowError("chrif_authok: Data size mismatch! %d != %d\n", RFIFOW(fd,2) - 25, sizeof(struct mmo_charstatus));
+		ShowError("chrif_authok: Data size mismatch! %d != %"PRIuS"\n", RFIFOW(fd,2) - 25, sizeof(struct mmo_charstatus));
 		return;
 	}
 
@@ -850,9 +853,9 @@ void chrif_changedsex(int fd) {
 	// Path to activate this response:
 	// Map(start) (0x2b0e) -> Char(0x2727) -> Login
 	// Login(0x2723) [ALL] -> Char (0x2b0d)[ALL] -> Map (HERE)
-	// Char will usually be "logged in" despite being forced to log-out in the begining
+	// Char will usually be "logged in" despite being forced to log-out in the beginning
 	// of this process, but there's no need to perform map-server specific response
-	// as everything should've been changed through char-server [Panikon]
+	// as everything should been changed through char-server [Panikon]
 }
 /*==========================================
  * Request Char Server to Divorce Players
@@ -941,14 +944,14 @@ void chrif_idbanned(int fd) {
 	}
 
 	sd->login_id1++; // change identify, because if player come back in char within the 5 seconds, he can change its characters
-	if (RFIFOB(fd,6) == 0) { // 0: change of statut
+	if (RFIFOB(fd,6) == 0) { // 0: change of status
 		int ret_status = RFIFOL(fd,7); // status or final date of a banishment
 		if(0<ret_status && ret_status<=9)
 			clif->message(sd->fd, msg_txt(411+ret_status)); // Message IDs (for search convenience): 412, 413, 414, 415, 416, 417, 418, 419, 420
 		else if(ret_status==100)
 			clif->message(sd->fd, msg_txt(421));
 		else
-			clif->message(sd->fd, msg_txt(420)); //"Your account has not more authorised."
+			clif->message(sd->fd, msg_txt(420)); //"Your account has not more authorized."
 	} else if (RFIFOB(fd,6) == 1) { // 1: ban
 		time_t timestamp;
 		char tmpstr[2048];
@@ -1175,7 +1178,7 @@ bool chrif_load_scdata(int fd) {
 	
 	for (i = 0; i < count; i++) {
 		data = (struct status_change_data*)RFIFOP(fd,14 + i*sizeof(struct status_change_data));
-		status->change_start(NULL, &sd->bl, (sc_type)data->type, 10000, data->val1, data->val2, data->val3, data->val4, data->tick, 15);
+		status->change_start(NULL, &sd->bl, (sc_type)data->type, 10000, data->val1, data->val2, data->val3, data->val4, data->tick, 7);
 	}
 	
 	pc->scdata_received(sd);
@@ -1203,7 +1206,7 @@ bool chrif_ragsrvinfo(int base_rate, int job_rate, int drop_rate) {
 
 
 /*=========================================
- * Tell char-server charcter disconnected [Wizputer]
+ * Tell char-server character disconnected [Wizputer]
  *-----------------------------------------*/
 bool chrif_char_offline_nsd(int account_id, int char_id) {
 	chrif_check(false);
@@ -1244,7 +1247,7 @@ bool chrif_char_reset_offline(void) {
 }
 
 /*=========================================
- * Tell char-server charcter is online [Wizputer]
+ * Tell char-server character is online [Wizputer]
  *-----------------------------------------*/
 bool chrif_char_online(struct map_session_data *sd) {
 	chrif_check(false);
@@ -1364,7 +1367,7 @@ int chrif_parse(int fd) {
 		if (cmd < 0x2af8 || cmd >= 0x2af8 + ARRAYLENGTH(chrif->packet_len_table) || chrif->packet_len_table[cmd-0x2af8] == 0) {
 			r = intif->parse(fd); // Passed on to the intif
 
-			if (r == 1) continue;	// Treated in intif 
+			if (r == 1) continue;	// Treated in intif
 			if (r == 2) return 0;	// Didn't have enough data (len==-1)
 
 			ShowWarning("chrif_parse: session #%d, intif->parse failed (unrecognized command 0x%.4x).\n", fd, cmd);
@@ -1530,7 +1533,7 @@ void chrif_send_report(char* buf, int len) {
 }
 
 /**
- * Sends a single scdata for saving into char server, meant to ensure integrity of durationless conditions
+ * Sends a single scdata for saving into char server, meant to ensure integrity of duration-less conditions
  **/
 void chrif_save_scdata_single(int account_id, int char_id, short type, struct status_change_entry *sce) {
 	
@@ -1552,7 +1555,7 @@ void chrif_save_scdata_single(int account_id, int char_id, short type, struct st
 	
 }
 /**
- * Sends a single scdata deletion request into char server, meant to ensure integrity of durationless conditions
+ * Sends a single scdata deletion request into char server, meant to ensure integrity of duration-less conditions
  **/
 void chrif_del_scdata_single(int account_id, int char_id, short type) {
 	
@@ -1635,7 +1638,7 @@ void do_init_chrif(bool minimal) {
 
 
 /*=====================================
-* Default Functions : chrif.h 
+* Default Functions : chrif.h
 * Generated by HerculesInterfaceMaker
 * created by Susu
 *-------------------------------------*/

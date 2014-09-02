@@ -2,8 +2,14 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#ifndef _MAP_SEARCHSTORE_H_
-#define _MAP_SEARCHSTORE_H_
+#ifndef MAP_SEARCHSTORE_H
+#define MAP_SEARCHSTORE_H
+
+#include <time.h>
+
+#include "map.h" // MESSAGE_SIZE
+#include "../common/cbasetypes.h"
+#include "../common/mmo.h" // MAX_SLOTS
 
 /**
  * Defines
@@ -97,4 +103,4 @@ struct searchstore_interface *searchstore;
 
 void searchstore_defaults (void);
 
-#endif /* _MAP_SEARCHSTORE_H_ */
+#endif /* MAP_SEARCHSTORE_H */

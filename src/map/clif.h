@@ -2,16 +2,16 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#ifndef _MAP_CLIF_H_
-#define _MAP_CLIF_H_
+#ifndef MAP_CLIF_H
+#define MAP_CLIF_H
 
+#include <stdarg.h>
+
+#include "map.h"
+#include "packets_struct.h"
 #include "../common/cbasetypes.h"
 #include "../common/db.h"
 #include "../common/mmo.h"
-#include "../common/socket.h"
-#include "../map/map.h"
-#include "../map/packets_struct.h"
-#include <stdarg.h>
 
 /**
  * Declarations
@@ -20,7 +20,6 @@ struct item;
 struct item_data;
 struct storage_data;
 struct guild_storage;
-struct block_list;
 struct unit_data;
 struct map_session_data;
 struct homun_data;
@@ -67,7 +66,7 @@ typedef enum send_target {
 	AREA,               // area
 	AREA_WOS,           // area, without self
 	AREA_WOC,           // area, without chatrooms
-	AREA_WOSC,          // area, without own chatroom
+	AREA_WOSC,          // area, without own chatrooms
 	AREA_CHAT_WOC,      // hearable area, without chatrooms
 	CHAT,               // current chatroom
 	CHAT_WOS,           // current chatroom, without self
@@ -347,6 +346,22 @@ enum clif_messages {
 	ITEM_CANT_OBTAIN_WEIGHT = 0x34, /* you cannot carry more items because you are overweight. */
 	SKILL_CANT_USE_AREA = 0x536,
 	ITEM_CANT_USE_AREA =  0x537,
+};
+
+/**
+ * Used to answer CZ_PC_BUY_CASH_POINT_ITEM (clif_parse_cashshop_buy)
+ **/
+enum cashshop_error {
+	ERROR_TYPE_NONE = 0,			// The deal has successfully completed. (ERROR_TYPE_NONE)
+	ERROR_TYPE_NPC,					// The Purchase has failed because the NPC does not exist. (ERROR_TYPE_NPC)
+	ERROR_TYPE_SYSTEM,				// The Purchase has failed because the Kafra Shop System is not working correctly. (ERROR_TYPE_SYSTEM)
+	ERROR_TYPE_INVENTORY_WEIGHT,	// You are over your Weight Limit. (ERROR_TYPE_INVENTORY_WEIGHT)
+	ERROR_TYPE_EXCHANGE,			// You cannot purchase items while you are in a trade. (ERROR_TYPE_EXCHANGE)
+	ERROR_TYPE_ITEM_ID,				// The Purchase has failed because the Item Information was incorrect. (ERROR_TYPE_ITEM_ID)
+	ERROR_TYPE_MONEY,				// You do not have enough Kafra Credit Points. (ERROR_TYPE_MONEY)
+	// Unofficial type names
+	ERROR_TYPE_QUANTITY,			// You can purchase up to 10 items. (ERROR_TYPE_QUANTITY)
+	ERROR_TYPE_NOT_ALL,				// Some items could not be purchased. (ERROR_TYPE_NOT_ALL)
 };
 
 /**
@@ -650,6 +665,7 @@ struct clif_interface {
 	void (*sitting) (struct block_list* bl);
 	void (*standing) (struct block_list* bl);
 	void (*arrow_create_list) (struct map_session_data *sd);
+	void (*refresh_storagewindow) (struct map_session_data *sd);
 	void (*refresh) (struct map_session_data *sd);
 	void (*fame_blacksmith) (struct map_session_data *sd, int points);
 	void (*fame_alchemist) (struct map_session_data *sd, int points);
@@ -799,7 +815,7 @@ struct clif_interface {
 	void (*message) (const int fd, const char* mes);
 	void (*messageln) (const int fd, const char* mes);
 	/* message+s(printf) */
-	void (*messages) (const int fd, const char* mes, ...);
+	void (*messages) (const int fd, const char *mes, ...) __attribute__((format(printf, 2, 3)));
 	int (*colormes) (int fd, enum clif_colors color, const char* msg);
 	bool (*process_message) (struct map_session_data *sd, int format, char **name_, size_t *namelen_, char **message_, size_t *messagelen_);
 	void (*wisexin) (struct map_session_data *sd,int type,int flag);
@@ -910,7 +926,7 @@ struct clif_interface {
 	void (*friendslist_toggle) (struct map_session_data *sd,int account_id, int char_id, int online);
 	void (*friendlist_req) (struct map_session_data* sd, int account_id, int char_id, const char* name);
 	/* gm-related */
-	void (*GM_kickack) (struct map_session_data *sd, int id);
+	void (*GM_kickack) (struct map_session_data *sd, int result);
 	void (*GM_kick) (struct map_session_data *sd,struct map_session_data *tsd);
 	void (*manner_message) (struct map_session_data* sd, uint32 type);
 	void (*GM_silence) (struct map_session_data* sd, struct map_session_data* tsd, uint8 type);
@@ -1274,4 +1290,4 @@ struct clif_interface *clif;
 
 void clif_defaults(void);
 
-#endif /* _MAP_CLIF_H_ */
+#endif /* MAP_CLIF_H */

@@ -2,18 +2,21 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
+#define HERCULES_CORE
+
+#include "buyingstore.h"  // struct s_buyingstore
+
+#include "atcommand.h"  // msg_txt
+#include "battle.h"  // battle_config.*
+#include "chrif.h"
+#include "clif.h"  // clif->buyingstore_*
+#include "log.h"  // log_pick_pc, log_zeny
+#include "pc.h"  // struct map_session_data
 #include "../common/cbasetypes.h"
 #include "../common/db.h"  // ARR_FIND
 #include "../common/showmsg.h"  // ShowWarning
 #include "../common/socket.h"  // RBUF*
 #include "../common/strlib.h"  // safestrncpy
-#include "atcommand.h"  // msg_txt
-#include "battle.h"  // battle_config.*
-#include "buyingstore.h"  // struct s_buyingstore
-#include "clif.h"  // clif->buyingstore_*
-#include "log.h"  // log_pick_pc, log_zeny
-#include "pc.h"  // struct map_session_data
-#include "chrif.h"
 
 struct buyingstore_interface buyingstore_s;
 
@@ -123,8 +126,9 @@ void buyingstore_create(struct map_session_data* sd, int zenylimit, unsigned cha
 			break;
 		}
 
-		if( !id->flag.buyingstore || !itemdb->cantrade_sub(id, pc_get_group_level(sd), pc_get_group_level(sd)) || ( idx = pc->search_inventory(sd, nameid) ) == -1 )
-		{// restrictions: allowed, no character-bound items and at least one must be owned
+		if (!id->flag.buyingstore || !itemdb->cantrade_sub(id, pc_get_group_level(sd), pc_get_group_level(sd))
+		 || (idx = pc->search_inventory(sd, nameid)) == INDEX_NOT_FOUND
+		 ) { // restrictions: allowed, no character-bound items and at least one must be owned
 			break;
 		}
 

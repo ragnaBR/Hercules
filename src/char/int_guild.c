@@ -2,21 +2,25 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#include "../common/cbasetypes.h"
-#include "../common/mmo.h"
-#include "../common/malloc.h"
-#include "../common/socket.h"
-#include "../common/db.h"
-#include "../common/showmsg.h"
-#include "../common/strlib.h"
-#include "../common/timer.h"
-#include "char.h"
-#include "inter.h"
+#define HERCULES_CORE
+
+#include "../config/core.h" // DBPATH
 #include "int_guild.h"
 
-#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+#include "char.h"
+#include "inter.h"
+#include "../common/cbasetypes.h"
+#include "../common/db.h"
+#include "../common/malloc.h"
+#include "../common/mmo.h"
+#include "../common/showmsg.h"
+#include "../common/socket.h"
+#include "../common/strlib.h"
+#include "../common/timer.h"
 
 #define GS_MEMBER_UNMODIFIED 0x00
 #define GS_MEMBER_MODIFIED 0x01
@@ -113,7 +117,7 @@ int inter_guild_tosql(struct guild *g,int flag)
 	// GS_EXPULSION `guild_expulsion` (`guild_id`,`account_id`,`name`,`mes`)
 	// GS_SKILL `guild_skill` (`guild_id`,`id`,`lv`)
 
-	// temporary storage for str convertion. They must be twice the size of the
+	// temporary storage for str conversion. They must be twice the size of the
 	// original string to ensure no overflows will occur. [Skotlex]
 	char t_info[256];
 	char esc_name[NAME_LENGTH*2+1];
@@ -832,7 +836,7 @@ int guild_calcinfo(struct guild *g)
 	// Save next exp step
 	g->next_exp = nextexp;
 
-	// Set the max number of members, Guild Extention skill - currently adds 6 to max per skill lv.
+	// Set the max number of members, Guild Extension skill - currently adds 6 to max per skill lv.
 	g->max_member = 16 + guild_checkskill(g, GD_EXTENSION) * 6;
 	if(g->max_member > MAX_GUILD)
 	{
@@ -1138,8 +1142,8 @@ int mapif_parse_CreateGuild(int fd,int account_id,char *name,struct guild_member
 		mapif_guild_created(fd,account_id,NULL);
 		return 0;
 	}
-	// Check Authorised letters/symbols in the name of the character
-	if (char_name_option == 1) { // only letters/symbols in char_name_letters are authorised
+	// Check Authorized letters/symbols in the name of the character
+	if (char_name_option == 1) { // only letters/symbols in char_name_letters are authorized
 		for (i = 0; i < NAME_LENGTH && name[i]; i++)
 			if (strchr(char_name_letters, name[i]) == NULL) {
 				mapif_guild_created(fd,account_id,NULL);
@@ -1208,7 +1212,7 @@ int mapif_parse_CreateGuild(int fd,int account_id,char *name,struct guild_member
 // Return guild info to client
 int mapif_parse_GuildInfo(int fd,int guild_id)
 {
-	struct guild * g = inter_guild_fromsql(guild_id); //We use this because on start-up the info of castle-owned guilds is requied. [Skotlex]
+	struct guild * g = inter_guild_fromsql(guild_id); //We use this because on start-up the info of castle-owned guilds is required. [Skotlex]
 	if(g)
 	{
 		if (!guild_calcinfo(g))
@@ -1421,29 +1425,61 @@ int mapif_parse_GuildMessage(int fd,int guild_id,int account_id,char *mes,int le
 	return mapif_guild_message(guild_id,account_id,mes,len, fd);
 }
 
-// Modification of the guild
+/**
+ * Changes basic guild information
+ * The types are available in mmo.h::guild_basic_info
+ **/
 int mapif_parse_GuildBasicInfoChange(int fd, int guild_id, int type, const void *data, int len) {
 	struct guild *g;
-	short value = *((const int16 *)data);
+	struct guild_skill gd_skill;
+	short value;
 	g = inter_guild_fromsql(guild_id);
-	if(g==NULL)
+
+	if( g == NULL )
 		return 0;
 
 	switch(type) {
+		case GBI_EXP:
+			value = *((const int16 *)data);
+			if( value < 0 && abs(value) > g->exp )
+				return 0;
+			g->exp += value;
+			guild_calcinfo(g);
+			break;
+
 		case GBI_GUILDLV:
+			value = *((const int16 *)data);
 			if (value > 0 && g->guild_lv + value <= MAX_GUILDLEVEL) {
 				g->guild_lv += value;
 				g->skill_point += value;
 			} else if (value < 0 && g->guild_lv + value >= 1)
 				g->guild_lv += value;
-			mapif_guild_info(-1,g);
-			g->save_flag |= GS_LEVEL;
-			return 0;
-		default:
-			ShowError("int_guild: GuildBasicInfoChange: Unknown type %d\n",type);
 			break;
+
+		case GBI_SKILLPOINT:
+			value = *((const int16 *)data);
+			if( g->skill_point+value < 0 )
+				return 0;
+			g->skill_point += value;
+			break;
+
+		case GBI_SKILLLV:
+			gd_skill = *((const struct guild_skill*)data);
+			memcpy(&(g->skill[(gd_skill.id - GD_SKILLBASE)]), &gd_skill, sizeof(gd_skill));
+			if( !guild_calcinfo(g) )
+				mapif_guild_info(-1,g);
+			g->save_flag |= GS_SKILL;
+			mapif_guild_skillupack(g->guild_id, gd_skill.id, 0);
+			break;
+
+		default:
+			ShowError("int_guild: GuildBasicInfoChange: Unknown type %d, see mmo.h::guild_basic_info for more information\n",type);
+			return 0;
 	}
-	mapif_guild_basicinfochanged(guild_id,type,data,len);
+	mapif_guild_info(-1,g);
+	g->save_flag |= GS_LEVEL;
+	// Information is already sent in mapif_guild_info
+	//mapif_guild_basicinfochanged(guild_id,type,data,len);
 	return 0;
 }
 

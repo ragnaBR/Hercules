@@ -2,56 +2,59 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#include "../common/cbasetypes.h"
-#include "../common/mmo.h"
-#include "../common/timer.h"
-#include "../common/nullpo.h"
-#include "../common/core.h"
-#include "../common/showmsg.h"
-#include "../common/malloc.h"
-#include "../common/random.h"
-#include "../common/socket.h"
-#include "../common/strlib.h"
-#include "../common/utils.h"
-#include "../common/conf.h"
-#include "../common/sysinfo.h"
+#define HERCULES_CORE
 
+#include "../config/core.h" // AUTOLOOTITEM_SIZE, AUTOTRADE_PERSISTENCY, MAX_SUGGESTIONS, MOB_FLEE(), MOB_HIT(), RENEWAL, RENEWAL_DROP, RENEWAL_EXP
 #include "atcommand.h"
-#include "battle.h"
-#include "chat.h"
-#include "clif.h"
-#include "chrif.h"
-#include "duel.h"
-#include "intif.h"
-#include "itemdb.h"
-#include "log.h"
-#include "map.h"
-#include "pc.h"
-#include "pc_groups.h" // groupid2name
-#include "status.h"
-#include "skill.h"
-#include "mob.h"
-#include "npc.h"
-#include "pet.h"
-#include "homunculus.h"
-#include "mail.h"
-#include "mercenary.h"
-#include "elemental.h"
-#include "party.h"
-#include "guild.h"
-#include "script.h"
-#include "storage.h"
-#include "trade.h"
-#include "unit.h"
-#include "mapreg.h"
-#include "quest.h"
-#include "searchstore.h"
-#include "HPMmap.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
+
+#include "HPMmap.h"
+#include "battle.h"
+#include "chat.h"
+#include "chrif.h"
+#include "clif.h"
+#include "duel.h"
+#include "elemental.h"
+#include "guild.h"
+#include "homunculus.h"
+#include "intif.h"
+#include "itemdb.h"
+#include "log.h"
+#include "mail.h"
+#include "map.h"
+#include "mapreg.h"
+#include "mercenary.h"
+#include "mob.h"
+#include "npc.h"
+#include "party.h"
+#include "pc.h"
+#include "pc_groups.h" // groupid2name
+#include "pet.h"
+#include "quest.h"
+#include "script.h"
+#include "searchstore.h"
+#include "skill.h"
+#include "status.h"
+#include "storage.h"
+#include "trade.h"
+#include "unit.h"
+#include "../common/cbasetypes.h"
+#include "../common/conf.h"
+#include "../common/core.h"
+#include "../common/malloc.h"
+#include "../common/mmo.h" // MAX_CARTS
+#include "../common/nullpo.h"
+#include "../common/random.h"
+#include "../common/showmsg.h"
+#include "../common/socket.h"
+#include "../common/strlib.h"
+#include "../common/sysinfo.h"
+#include "../common/timer.h"
+#include "../common/utils.h"
 
 struct atcommand_interface atcommand_s;
 
@@ -105,7 +108,7 @@ bool msg_config_read(const char *cfg_name, bool allow_override) {
 	while(fgets(line, sizeof(line), fp)) {
 		if (line[0] == '/' && line[1] == '/')
 			continue;
-		if (sscanf(line, "%[^:]: %[^\r\n]", w1, w2) != 2)
+		if (sscanf(line, "%1023[^:]: %1023[^\r\n]", w1, w2) != 2)
 			continue;
 
 		if (strcmpi(w1, "import") == 0) {
@@ -944,7 +947,7 @@ ACMD(jobchange) {
 				}
 			}
 			
-			// High Jobs, Babys and Third
+			// High Jobs, Babies and Third
 			for( i = JOB_NOVICE_HIGH; i < JOB_MAX && !found; i++ ){
 				if (strncmpi(message, pc->job_name(i), 16) == 0) {
 					job = i;
@@ -1120,14 +1123,14 @@ ACMD(item)
 	memset(item_name, '\0', sizeof(item_name));
 
 	if (!strcmpi(info->command,"itembound") && (!message || !*message || (
-		sscanf(message, "\"%99[^\"]\" %d %d", item_name, &number, &bound) < 2 && 
-		sscanf(message, "%99s %d %d", item_name, &number, &bound) < 2 
+		sscanf(message, "\"%99[^\"]\" %d %d", item_name, &number, &bound) < 2 &&
+		sscanf(message, "%99s %d %d", item_name, &number, &bound) < 2
 	))) {
 		clif->message(fd, msg_txt(295)); // Please enter an item name or ID (usage: @itembound <item name/ID> <quantity> <bound_type>).
 		return false;
 	} else if (!message || !*message || (
-		sscanf(message, "\"%99[^\"]\" %d", item_name, &number) < 1 && 
-		sscanf(message, "%99s %d", item_name, &number) < 1 )) 
+		sscanf(message, "\"%99[^\"]\" %d", item_name, &number) < 1 &&
+		sscanf(message, "%99s %d", item_name, &number) < 1 ))
 		{
  		clif->message(fd, msg_txt(983)); // Please enter an item name or ID (usage: @item <item name/ID> <quantity>).
 		return false;
@@ -1326,7 +1329,7 @@ ACMD(baselevelup)
 			clif->message(fd, msg_txt(47)); // Base level can't go any higher.
 			return false;
 		} // End Addition
-		if ((unsigned int)level > pc->maxbaselv(sd) || (unsigned int)level > pc->maxbaselv(sd) - sd->status.base_level) // fix positiv overflow
+		if ((unsigned int)level > pc->maxbaselv(sd) || (unsigned int)level > pc->maxbaselv(sd) - sd->status.base_level) // fix positive overflow
 			level = pc->maxbaselv(sd) - sd->status.base_level;
 		for (i = 0; i < level; i++)
 			status_point += pc->gets_status_point(sd->status.base_level + i);
@@ -1386,7 +1389,7 @@ ACMD(joblevelup)
 			clif->message(fd, msg_txt(23)); // Job level can't go any higher.
 			return false;
 		}
-		if ((unsigned int)level > pc->maxjoblv(sd) || (unsigned int)level > pc->maxjoblv(sd) - sd->status.job_level) // fix positiv overflow
+		if ((unsigned int)level > pc->maxjoblv(sd) || (unsigned int)level > pc->maxjoblv(sd) - sd->status.job_level) // fix positive overflow
 			level = pc->maxjoblv(sd) - sd->status.job_level;
 		sd->status.job_level += (unsigned int)level;
 		sd->status.skill_point += level;
@@ -1398,11 +1401,11 @@ ACMD(joblevelup)
 			return false;
 		}
 		level *=-1;
-		if ((unsigned int)level >= sd->status.job_level) // fix negativ overflow
+		if ((unsigned int)level >= sd->status.job_level) // fix negative overflow
 			level = sd->status.job_level-1;
 		sd->status.job_level -= (unsigned int)level;
 		if (sd->status.skill_point < level)
-			pc->resetskill(sd,0);	//Reset skills since we need to substract more points.
+			pc->resetskill(sd,0);	//Reset skills since we need to subtract more points.
 		if (sd->status.skill_point < level)
 			sd->status.skill_point = 0;
 		else
@@ -1628,7 +1631,7 @@ ACMD(model)
 		pc->changelook(sd, LOOK_HAIR, hair_style);
 		pc->changelook(sd, LOOK_HAIR_COLOR, hair_color);
 		pc->changelook(sd, LOOK_CLOTHES_COLOR, cloth_color);
-		clif->message(fd, msg_txt(36)); // Appearence changed.
+		clif->message(fd, msg_txt(36)); // Appearance changed.
 	} else {
 		clif->message(fd, msg_txt(37)); // An invalid number was specified.
 		return false;
@@ -1654,7 +1657,7 @@ ACMD(dye)
 	
 	if (cloth_color >= MIN_CLOTH_COLOR && cloth_color <= MAX_CLOTH_COLOR) {
 		pc->changelook(sd, LOOK_CLOTHES_COLOR, cloth_color);
-		clif->message(fd, msg_txt(36)); // Appearence changed.
+		clif->message(fd, msg_txt(36)); // Appearance changed.
 	} else {
 		clif->message(fd, msg_txt(37)); // An invalid number was specified.
 		return false;
@@ -1680,7 +1683,7 @@ ACMD(hair_style)
 	
 	if (hair_style >= MIN_HAIR_STYLE && hair_style <= MAX_HAIR_STYLE) {
 		pc->changelook(sd, LOOK_HAIR, hair_style);
-		clif->message(fd, msg_txt(36)); // Appearence changed.
+		clif->message(fd, msg_txt(36)); // Appearance changed.
 	} else {
 		clif->message(fd, msg_txt(37)); // An invalid number was specified.
 		return false;
@@ -1706,7 +1709,7 @@ ACMD(hair_color)
 	
 	if (hair_color >= MIN_HAIR_COLOR && hair_color <= MAX_HAIR_COLOR) {
 		pc->changelook(sd, LOOK_HAIR_COLOR, hair_color);
-		clif->message(fd, msg_txt(36)); // Appearence changed.
+		clif->message(fd, msg_txt(36)); // Appearance changed.
 	} else {
 		clif->message(fd, msg_txt(37)); // An invalid number was specified.
 		return false;
@@ -1718,67 +1721,63 @@ ACMD(hair_color)
 /*==========================================
  * @go [city_number or city_name] - Updated by Harbin
  *------------------------------------------*/
-ACMD(go)
-{
+ACMD(go) {
 	int i;
-	int town;
+	int town = INT_MAX; // Initialized to INT_MAX instead of -1 to avoid conflicts with those who map [-3:-1] to @memo locations.
 	char map_name[MAP_NAME_LENGTH];
-	int16 m;
 	
 	const struct {
 		char map[MAP_NAME_LENGTH];
 		int x, y;
+		int min_match; ///< Minimum string length to match
 	} data[] = {
-		{ MAP_PRONTERA,    156, 191 }, //  0=Prontera
-		{ MAP_MORROC,      156,  93 }, //  1=Morroc
-		{ MAP_GEFFEN,      119,  59 }, //  2=Geffen
-		{ MAP_PAYON,       162, 233 }, //  3=Payon
-		{ MAP_ALBERTA,     192, 147 }, //  4=Alberta
+		{ MAP_PRONTERA,    156, 191, 3 }, //  0 = Prontera
+		{ MAP_MORROC,      156,  93, 4 }, //  1 = Morroc
+		{ MAP_GEFFEN,      119,  59, 3 }, //  2 = Geffen
+		{ MAP_PAYON,       162, 233, 3 }, //  3 = Payon
+		{ MAP_ALBERTA,     192, 147, 3 }, //  4 = Alberta
 #ifdef RENEWAL
-		{ MAP_IZLUDE,      128, 146 }, //  5=Izlude (Renewal)
+		{ MAP_IZLUDE,      128, 146, 3 }, //  5 = Izlude (Renewal)
 #else
-		{ MAP_IZLUDE,      128, 114 }, //  5=Izlude
+		{ MAP_IZLUDE,      128, 114, 3 }, //  5 = Izlude
 #endif
-		{ MAP_ALDEBARAN,   140, 131 }, //  6=Al de Baran
-		{ MAP_LUTIE,       147, 134 }, //  7=Lutie
-		{ MAP_COMODO,      209, 143 }, //  8=Comodo
-		{ MAP_YUNO,        157,  51 }, //  9=Yuno
-		{ MAP_AMATSU,      198,  84 }, // 10=Amatsu
-		{ MAP_GONRYUN,     160, 120 }, // 11=Gonryun
-		{ MAP_UMBALA,       89, 157 }, // 12=Umbala
-		{ MAP_NIFLHEIM,     21, 153 }, // 13=Niflheim
-		{ MAP_LOUYANG,     217,  40 }, // 14=Louyang
-		{ MAP_NOVICE,       53, 111 }, // 15=Training Grounds
-		{ MAP_JAIL,         23,  61 }, // 16=Prison
-		{ MAP_JAWAII,      249, 127 }, // 17=Jawaii
-		{ MAP_AYOTHAYA,    151, 117 }, // 18=Ayothaya
-		{ MAP_EINBROCH,     64, 200 }, // 19=Einbroch
-		{ MAP_LIGHTHALZEN, 158,  92 }, // 20=Lighthalzen
-		{ MAP_EINBECH,      70,  95 }, // 21=Einbech
-		{ MAP_HUGEL,        96, 145 }, // 22=Hugel
-		{ MAP_RACHEL,      130, 110 }, // 23=Rachel
-		{ MAP_VEINS,       216, 123 }, // 24=Veins
-		{ MAP_MOSCOVIA,    223, 184 }, // 25=Moscovia
-		{ MAP_MIDCAMP,     180, 240 }, // 26=Midgard Camp
-		{ MAP_MANUK,       282, 138 }, // 27=Manuk
-		{ MAP_SPLENDIDE,   197, 176 }, // 28=Splendide
-		{ MAP_BRASILIS,    182, 239 }, // 29=Brasilis
-		{ MAP_DICASTES,    198, 187 }, // 30=El Dicastes
-		{ MAP_MORA,         44, 151 }, // 31=Mora
-		{ MAP_DEWATA,      200, 180 }, // 32=Dewata
-		{ MAP_MALANGDO,    140, 114 }, // 33=Malangdo Island
-		{ MAP_MALAYA,      242, 211 }, // 34=Malaya Port
-		{ MAP_ECLAGE,      110,  39 }, // 35=Eclage
+		{ MAP_ALDEBARAN,   140, 131, 3 }, //  6 = Aldebaran
+		{ MAP_LUTIE,       147, 134, 3 }, //  7 = Lutie
+		{ MAP_COMODO,      209, 143, 3 }, //  8 = Comodo
+		{ MAP_YUNO,        157,  51, 3 }, //  9 = Juno
+		{ MAP_AMATSU,      198,  84, 3 }, // 10 = Amatsu
+		{ MAP_GONRYUN,     160, 120, 3 }, // 11 = Kunlun
+		{ MAP_UMBALA,       89, 157, 3 }, // 12 = Umbala
+		{ MAP_NIFLHEIM,     21, 153, 3 }, // 13 = Niflheim
+		{ MAP_LOUYANG,     217,  40, 3 }, // 14 = Luoyang
+		{ MAP_NOVICE,       53, 111, 3 }, // 15 = Training Grounds
+		{ MAP_JAIL,         23,  61, 3 }, // 16 = Prison
+		{ MAP_JAWAII,      249, 127, 3 }, // 17 = Jawaii
+		{ MAP_AYOTHAYA,    151, 117, 3 }, // 18 = Ayothaya
+		{ MAP_EINBROCH,     64, 200, 5 }, // 19 = Einbroch
+		{ MAP_LIGHTHALZEN, 158,  92, 3 }, // 20 = Lighthalzen
+		{ MAP_EINBECH,      70,  95, 5 }, // 21 = Einbech
+		{ MAP_HUGEL,        96, 145, 3 }, // 22 = Hugel
+		{ MAP_RACHEL,      130, 110, 3 }, // 23 = Rachel
+		{ MAP_VEINS,       216, 123, 3 }, // 24 = Veins
+		{ MAP_MOSCOVIA,    223, 184, 3 }, // 25 = Moscovia
+		{ MAP_MIDCAMP,     180, 240, 3 }, // 26 = Midgard Camp
+		{ MAP_MANUK,       282, 138, 3 }, // 27 = Manuk
+		{ MAP_SPLENDIDE,   197, 176, 3 }, // 28 = Splendide
+		{ MAP_BRASILIS,    182, 239, 3 }, // 29 = Brasilis
+		{ MAP_DICASTES,    198, 187, 3 }, // 30 = El Dicastes
+		{ MAP_MORA,         44, 151, 4 }, // 31 = Mora
+		{ MAP_DEWATA,      200, 180, 3 }, // 32 = Dewata
+		{ MAP_MALANGDO,    140, 114, 5 }, // 33 = Malangdo Island
+		{ MAP_MALAYA,      242, 211, 5 }, // 34 = Malaya Port
+		{ MAP_ECLAGE,      110,  39, 3 }, // 35 = Eclage
 	};
 			
 	memset(map_name, '\0', sizeof(map_name));
 	memset(atcmd_output, '\0', sizeof(atcmd_output));
 	
-	// get the number
-	town = atoi(message);
-	
-	if (!message || !*message || sscanf(message, "%11s", map_name) < 1 || town < 0 || town >= ARRAYLENGTH(data))
-	{// no value matched so send the list of locations
+	if (!message || !*message || sscanf(message, "%11s", map_name) < 1) {
+		// no value matched so send the list of locations
 		const char* text;
 		
 		// attempt to find the text help string
@@ -1792,98 +1791,49 @@ ACMD(go)
 		
 		return false;
 	}
-	
-	// get possible name of the city
-	map_name[MAP_NAME_LENGTH-1] = '\0';
-	for (i = 0; map_name[i]; i++)
-		map_name[i] = TOLOWER(map_name[i]);
-	// try to identify the map name
-	if (strncmp(map_name, "prontera", 3) == 0) {
-		town = 0;
-	} else if (strncmp(map_name, "morocc", 4) == 0 ||
-	           strncmp(map_name, "morroc", 4) == 0) {
-		town = 1;
-	} else if (strncmp(map_name, "geffen", 3) == 0) {
-		town = 2;
-	} else if (strncmp(map_name, "payon", 3) == 0) {
-		town = 3;
-	} else if (strncmp(map_name, "alberta", 3) == 0) {
-		town = 4;
-	} else if (strncmp(map_name, "izlude", 3) == 0) {
-		town = 5;
-	} else if (strncmp(map_name, "aldebaran", 3) == 0) {
-		town = 6;
-	} else if (strncmp(map_name, "lutie", 3) == 0 ||
-	           strcmp(map_name,  "christmas") == 0 ||
-	           strncmp(map_name, "xmas", 3) == 0 ||
-	           strncmp(map_name, "x-mas", 3) == 0) {
-		town = 7;
-	} else if (strncmp(map_name, "comodo", 3) == 0) {
-		town = 8;
-	} else if (strncmp(map_name, "juno", 3) == 0 ||
-	           strncmp(map_name, "yuno", 3) == 0) {
-		town = 9;
-	} else if (strncmp(map_name, "amatsu", 3) == 0) {
-		town = 10;
-	} else if (strncmp(map_name, "kunlun", 3) == 0 ||
-	           strncmp(map_name, "gonryun", 3) == 0) {
-		town = 11;
-	} else if (strncmp(map_name, "umbala", 3) == 0) {
-		town = 12;
-	} else if (strncmp(map_name, "niflheim", 3) == 0) {
-		town = 13;
-	} else if (strncmp(map_name, "louyang", 3) == 0) {
-		town = 14;
-	} else if (strncmp(map_name, "new_1-1", 3) == 0 ||
-	           strncmp(map_name, "startpoint", 3) == 0 ||
-	           strncmp(map_name, "beginning", 3) == 0) {
-		town = 15;
-	} else if (strncmp(map_name, "sec_pri", 3) == 0 ||
-	           strncmp(map_name, "prison", 3) == 0 ||
-	           strncmp(map_name, "jail", 3) == 0) {
-		town = 16;
-	} else if (strncmp(map_name, "jawaii", 3) == 0) {
-		town = 17;
-	} else if (strncmp(map_name, "ayothaya", 3) == 0) {
-		town = 18;
-	} else if (strncmp(map_name, "einbroch", 5) == 0) {
-		town = 19;
-	} else if (strncmp(map_name, "lighthalzen", 3) == 0) {
-		town = 20;
-	} else if (strncmp(map_name, "einbech", 5) == 0) {
-		town = 21;
-	} else if (strncmp(map_name, "hugel", 3) == 0) {
-		town = 22;
-	} else if (strncmp(map_name, "rachel", 3) == 0) {
-		town = 23;
-	} else if (strncmp(map_name, "veins", 3) == 0) {
-		town = 24;
-	} else if (strncmp(map_name, "moscovia", 3) == 0) {
-		town = 25;
-	} else if (strncmp(map_name, "mid_camp", 3) == 0) {
-		town = 26;
-	} else if (strncmp(map_name, "manuk", 3) == 0) {
-		town = 27;
-	} else if (strncmp(map_name, "splendide", 3) == 0) {
-		town = 28;
-	} else if (strncmp(map_name, "brasilis", 3) == 0) {
-		town = 29;
-	} else if (strncmp(map_name, "dicastes01", 3) == 0) {
-		town = 30;
-	} else if (strcmp(map_name,  "mora") == 0) {
-		town = 31;
-	} else if (strncmp(map_name, "dewata", 3) == 0) {
-		town = 32;
-	} else if (strncmp(map_name, "malangdo", 5) == 0) {
-		town = 33;
-	} else if (strncmp(map_name, "malaya", 5) == 0) {
-		town = 34;
-	} else if (strncmp(map_name, "eclage", 3) == 0) {
-		town = 35;
+
+	// Numeric entry
+	if (ISDIGIT(*message) || (message[0] == '-' && ISDIGIT(message[1]))) {
+		town = atoi(message);
 	}
-	
+
+	if (town < 0 || town >= ARRAYLENGTH(data)) {
+		map_name[MAP_NAME_LENGTH-1] = '\0';
+
+		// Match maps on the list
+		for (i = 0; i < ARRAYLENGTH(data); i++) {
+			if (strncmpi(map_name, data[i].map, data[i].min_match) == 0) {
+				town = i;
+				break;
+			}
+		}
+	}
+
+	if (town < 0 || town >= ARRAYLENGTH(data)) {
+		// Alternate spellings
+		if (strncmpi(map_name, "morroc", 4) == 0) { // Correct town name for 'morocc'
+			town = 1;
+		} else if (strncmpi(map_name, "lutie", 3) == 0) { // Correct town name for 'xmas'
+			town = 7;
+		} else if (strncmpi(map_name, "juno", 3) == 0) { // Correct town name for 'yuno'
+			town = 9;
+		} else if (strncmpi(map_name, "kunlun", 3) == 0) { // Original town name for 'gonryun'
+			town = 11;
+		} else if (strncmpi(map_name, "luoyang", 3) == 0) { // Original town name for 'louyang'
+			town = 14;
+		} else if (strncmpi(map_name, "startpoint", 3) == 0 // Easy to remember alternatives to 'new_1-1'
+		        || strncmpi(map_name, "beginning", 3) == 0) {
+			town = 15;
+		} else if (strncmpi(map_name, "prison", 3) == 0 // Easy to remember alternatives to 'sec_pri'
+		        || strncmpi(map_name, "jail", 3) == 0) {
+			town = 16;
+		} else if (strncmpi(map_name, "rael", 3) == 0) { // Original town name for 'rachel'
+			town = 23;
+		}
+	}
+
 	if (town >= 0 && town < ARRAYLENGTH(data)) {
-		m = map->mapname2mapid(data[town].map);
+		int16 m = map->mapname2mapid(data[town].map);
 		if (m >= 0 && map->list[m].flag.nowarpto && !pc_has_permission(sd, PC_PERM_WARP_ANYWHERE)) {
 			clif->message(fd, msg_txt(247));
 			return false;
@@ -1898,7 +1848,7 @@ ACMD(go)
 			clif->message(fd, msg_txt(1)); // Map not found.
 			return false;
 		}
-	} else { // if you arrive here, you have an error in town variable when reading of names
+	} else {
 		clif->message(fd, msg_txt(38)); // Invalid location number or name.
 		return false;
 	}
@@ -1946,7 +1896,7 @@ ACMD(monster)
 		return false;
 	}
 	
-	if ((mob_id = mob->db_searchname(monster)) == 0) // check name first (to avoid possible name begining by a number)
+	if ((mob_id = mob->db_searchname(monster)) == 0) // check name first (to avoid possible name beginning by a number)
 		mob_id = mob->db_checkid(atoi(monster));
 	
 	if (mob_id == 0) {
@@ -2761,7 +2711,7 @@ ACMD(char_block)
  *     mn: minute
  *     s:  second
  * <example> @ban +1m-2mn1s-6y test_player
- *           this example adds 1 month and 1 second, and substracts 2 minutes and 6 years at the same time.
+ *           this example adds 1 month and 1 second, and subtracts 2 minutes and 6 years at the same time.
  *------------------------------------------*/
 ACMD(char_ban)
 {
@@ -2929,12 +2879,12 @@ ACMD(doom)
 		{
 			status_kill(&pl_sd->bl);
 			clif->specialeffect(&pl_sd->bl,450,AREA);
-			clif->message(pl_sd->fd, msg_txt(61)); // The holy messenger has given judgement.
+			clif->message(pl_sd->fd, msg_txt(61)); // The holy messenger has given judgment.
 		}
 	}
 	mapit->free(iter);
 	
-	clif->message(fd, msg_txt(62)); // Judgement was made.
+	clif->message(fd, msg_txt(62)); // Judgment was made.
 	
 	return true;
 }
@@ -2954,12 +2904,12 @@ ACMD(doommap)
 		{
 			status_kill(&pl_sd->bl);
 			clif->specialeffect(&pl_sd->bl,450,AREA);
-			clif->message(pl_sd->fd, msg_txt(61)); // The holy messenger has given judgement.
+			clif->message(pl_sd->fd, msg_txt(61)); // The holy messenger has given judgment.
 		}
 	}
 	mapit->free(iter);
 	
-	clif->message(fd, msg_txt(62)); // Judgement was made.
+	clif->message(fd, msg_txt(62)); // Judgment was made.
 	
 	return true;
 }
@@ -3034,7 +2984,7 @@ ACMD(kick)
 	
 	if ( pc_get_group_level(sd) < pc_get_group_level(pl_sd) )
 	{
-		clif->message(fd, msg_txt(81)); // Your GM level don't authorise you to do this action on this player.
+		clif->message(fd, msg_txt(81)); // Your GM level don't authorize you to do this action on this player.
 		return false;
 	}
 	
@@ -3337,7 +3287,7 @@ ACMD(mapexit) {
 }
 
 /*==========================================
- * idsearch <part_of_name>: revrited by [Yor]
+ * idsearch <part_of_name>: rewrite by [Yor]
  *------------------------------------------*/
 ACMD(idsearch)
 {
@@ -3383,7 +3333,7 @@ ACMD(recallall)
 	memset(atcmd_output, '\0', sizeof(atcmd_output));
 	
 	if (sd->bl.m >= 0 && map->list[sd->bl.m].flag.nowarpto && !pc_has_permission(sd, PC_PERM_WARP_ANYWHERE)) {
-		clif->message(fd, msg_txt(1032)); // You are not authorized to warp somenone to your current map.
+		clif->message(fd, msg_txt(1032)); // You are not authorized to warp someone to your current map.
 		return false;
 	}
 	
@@ -3435,7 +3385,7 @@ ACMD(guildrecall)
 	}
 	
 	if (sd->bl.m >= 0 && map->list[sd->bl.m].flag.nowarpto && !pc_has_permission(sd, PC_PERM_WARP_ANYWHERE)) {
-		clif->message(fd, msg_txt(1032)); // You are not authorized to warp somenone to your current map.
+		clif->message(fd, msg_txt(1032)); // You are not authorized to warp someone to your current map.
 		return false;
 	}
 	
@@ -3492,7 +3442,7 @@ ACMD(partyrecall)
 	}
 	
 	if (sd->bl.m >= 0 && map->list[sd->bl.m].flag.nowarpto && !pc_has_permission(sd, PC_PERM_WARP_ANYWHERE)) {
-		clif->message(fd, msg_txt(1032)); // You are not authorized to warp somenone to your current map.
+		clif->message(fd, msg_txt(1032)); // You are not authorized to warp someone to your current map.
 		return false;
 	}
 	
@@ -3967,7 +3917,12 @@ ACMD(mount_peco)
 		return false;
 	}
 	
-	if( (sd->class_&MAPID_THIRDMASK) == MAPID_RUNE_KNIGHT && pc->checkskill(sd,RK_DRAGONTRAINING) > 0 ) {
+	if( (sd->class_&MAPID_THIRDMASK) == MAPID_RUNE_KNIGHT ) {
+		if( !pc->checkskill(sd,RK_DRAGONTRAINING) ) {
+			sprintf(atcmd_output, msg_txt(213), skill->get_desc(RK_DRAGONTRAINING)); // You need %s to mount!
+			clif->message(fd, atcmd_output);
+			return false;
+		}
 		if( !(sd->sc.option&OPTION_DRAGON1) ) {
 			clif->message(sd->fd,msg_txt(1119)); // You have mounted your Dragon.
 			pc->setoption(sd, sd->sc.option|OPTION_DRAGON1);
@@ -3977,7 +3932,12 @@ ACMD(mount_peco)
 		}
 		return true;
 	}
-	if( (sd->class_&MAPID_THIRDMASK) == MAPID_RANGER && pc->checkskill(sd,RA_WUGRIDER) > 0 ) {
+	if( (sd->class_&MAPID_THIRDMASK) == MAPID_RANGER ) {
+		if( !pc->checkskill(sd,RA_WUGRIDER) ) {
+			sprintf(atcmd_output, msg_txt(213), skill->get_desc(RA_WUGRIDER)); // You need %s to mount!
+			clif->message(fd, atcmd_output);
+			return false;
+		}
 		if( !pc_isridingwug(sd) ) {
 			clif->message(sd->fd,msg_txt(1121)); // You have mounted your Warg.
 			pc->setoption(sd, sd->sc.option|OPTION_WUGRIDER);
@@ -3997,21 +3957,23 @@ ACMD(mount_peco)
 		}
 		return true;
 	}
-	if (!pc_isriding(sd)) { // if actually no peco
-		
-		if (!pc->checkskill(sd, KN_RIDING)) {
-			clif->message(fd, msg_txt(213)); // You can not mount a Peco Peco with your current job.
-			return false;
+	if( sd->class_&MAPID_SWORDMAN && sd->class_&JOBL_2 ) {
+		if( !pc_isriding(sd) ) { // if actually no peco
+			if (!pc->checkskill(sd, KN_RIDING)) {
+				sprintf(atcmd_output, msg_txt(213), skill->get_desc(KN_RIDING)); // You need %s to mount!
+				clif->message(fd, atcmd_output);
+				return false;
+			}
+			pc->setoption(sd, sd->sc.option | OPTION_RIDING);
+			clif->message(fd, msg_txt(102)); // You have mounted a Peco Peco.
+		} else {//Dismount
+			pc->setoption(sd, sd->sc.option & ~OPTION_RIDING);
+			clif->message(fd, msg_txt(214)); // You have released your Peco Peco.
 		}
-		
-		pc->setoption(sd, sd->sc.option | OPTION_RIDING);
-		clif->message(fd, msg_txt(102)); // You have mounted a Peco Peco.
-	} else {//Dismount
-		pc->setoption(sd, sd->sc.option & ~OPTION_RIDING);
-		clif->message(fd, msg_txt(214)); // You have released your Peco Peco.
+		return true;
 	}
-	
-	return true;
+	clif->message(fd, msg_txt(215)); // Your class can't mount!
+	return false;
 }
 
 /*==========================================
@@ -4139,7 +4101,7 @@ ACMD(nuke) {
 			skill->castend_nodamage_id(&pl_sd->bl, &pl_sd->bl, NPC_SELFDESTRUCTION, 99, timer->gettick(), 0);
 			clif->message(fd, msg_txt(109)); // Player has been nuked!
 		} else {
-			clif->message(fd, msg_txt(81)); // Your GM level don't authorise you to do this action on this player.
+			clif->message(fd, msg_txt(81)); // Your GM level don't authorize you to do this action on this player.
 			return false;
 		}
 	} else {
@@ -4336,7 +4298,7 @@ ACMD(servertime) {
 		const struct TimerData * timer_data2 = timer->get(pc->day_timer_tid);
 		
 		if (map->night_flag == 0) {
-			sprintf(temp, msg_txt(235), // Game time: The game is actualy in daylight for %s.
+			sprintf(temp, msg_txt(235), // Game time: The game is actually in daylight for %s.
 			        txt_time((unsigned int)(DIFF_TICK(timer_data->tick,timer->gettick())/1000)));
 			clif->message(fd, temp);
 			if (DIFF_TICK(timer_data->tick, timer_data2->tick) > 0)
@@ -4347,7 +4309,7 @@ ACMD(servertime) {
 				        txt_time((unsigned int)(DIFF_TICK(timer_data2->tick,timer_data->tick)/1000)));
 			clif->message(fd, temp);
 		} else {
-			sprintf(temp, msg_txt(233), // Game time: The game is actualy in night for %s.
+			sprintf(temp, msg_txt(233), // Game time: The game is actually in night for %s.
 			        txt_time((unsigned int)(DIFF_TICK(timer_data2->tick,timer->gettick()) / 1000)));
 			clif->message(fd, temp);
 			if (DIFF_TICK(timer_data2->tick,timer_data->tick) > 0)
@@ -4421,7 +4383,7 @@ ACMD(jail) {
 	
 	if (pc_get_group_level(sd) < pc_get_group_level(pl_sd))
   	{ // you can jail only lower or same GM
-		clif->message(fd, msg_txt(81)); // Your GM level don't authorise you to do this action on this player.
+		clif->message(fd, msg_txt(81)); // Your GM level don't authorize you to do this action on this player.
 		return false;
 	}
 	
@@ -4472,7 +4434,7 @@ ACMD(unjail) {
 	
 	if (pc_get_group_level(sd) < pc_get_group_level(pl_sd)) { // you can jail only lower or same GM
 		
-		clif->message(fd, msg_txt(81)); // Your GM level don't authorise you to do this action on this player.
+		clif->message(fd, msg_txt(81)); // Your GM level don't authorize you to do this action on this player.
 		return false;
 	}
 	
@@ -4549,7 +4511,7 @@ ACMD(jailfor) {
 	}
 	
 	if (pc_get_group_level(pl_sd) > pc_get_group_level(sd)) {
-		clif->message(fd, msg_txt(81)); // Your GM level don't authorise you to do this action on this player.
+		clif->message(fd, msg_txt(81)); // Your GM level don't authorize you to do this action on this player.
 		return false;
 	}
 	
@@ -5295,7 +5257,7 @@ ACMD(useskill) {
 	
 	if ( pc_get_group_level(sd) < pc_get_group_level(pl_sd) )
 	{
-		clif->message(fd, msg_txt(81)); // Your GM level don't authorise you to do this action on this player.
+		clif->message(fd, msg_txt(81)); // Your GM level don't authorized you to do this action on this player.
 		return false;
 	}
 	
@@ -5510,7 +5472,7 @@ ACMD(autotrade) {
 		status->change_start(NULL,&sd->bl, SC_AUTOTRADE, 10000, 0, 0, 0, 0, ((timeout > 0) ? min(timeout,battle_config.at_timeout) : battle_config.at_timeout) * 60000, 0);
 	}
 
-	/* currently standalones are not supporting buyingstores, so we rely on the previous method */
+	/* currently standalone is not supporting buyingstores, so we rely on the previous method */
 	if( sd->state.buyingstore ) {
 		clif->authfail_fd(fd, 15);
 		return true;
@@ -6435,7 +6397,7 @@ ACMD(changesex)
 	int i;
 
 	pc->resetskill(sd,4);
-	// to avoid any problem with equipment and invalid sex, equipment is unequiped.
+	// to avoid any problem with equipment and invalid sex, equipment is unequipped.
 	for( i=0; i<EQI_MAX; i++ )
 		if( sd->equip_index[i] >= 0 ) pc->unequipitem(sd, sd->equip_index[i], 3);
 	chrif->changesex(sd);
@@ -6461,7 +6423,7 @@ ACMD(mute) {
 	
 	if ( pc_get_group_level(sd) < pc_get_group_level(pl_sd) )
 	{
-		clif->message(fd, msg_txt(81)); // Your GM level don't authorise you to do this action on this player.
+		clif->message(fd, msg_txt(81)); // Your GM level don't authorize you to do this action on this player.
 		return false;
 	}
 	
@@ -7465,6 +7427,8 @@ ACMD(fakename){
 		{
 			sd->fakename[0] = '\0';
 			clif->charnameack(0, &sd->bl);
+			if( sd->disguise )
+				clif->charnameack(sd->fd, &sd->bl);
 			clif->message(sd->fd, msg_txt(1307)); // Returned to real name.
 			return true;
 		}
@@ -7481,6 +7445,8 @@ ACMD(fakename){
 	
 	safestrncpy(sd->fakename, message, sizeof(sd->fakename));
 	clif->charnameack(0, &sd->bl);
+	if( sd->disguise ) // Another packet should be sent so the client updates the name for sd
+		clif->charnameack(sd->fd, &sd->bl);
 	clif->message(sd->fd, msg_txt(1310)); // Fake name enabled.
 	
 	return true;
@@ -7750,7 +7716,7 @@ ACMD(accept) {
 	}
 	
 	if(sd->duel_invite <= 0) {
-		// "Duel: @accept without invititation."
+		// "Duel: @accept without invitation."
 		clif->message(fd, msg_txt(360));
 		return false;
 	}
@@ -7770,7 +7736,7 @@ ACMD(accept) {
 
 ACMD(reject) {
 	if(sd->duel_invite <= 0) {
-		// "Duel: @reject without invititation."
+		// "Duel: @reject without invitation."
 		clif->message(fd, msg_txt(362));
 		return false;
 	}
@@ -8248,8 +8214,7 @@ ACMD(delitem) {
 	total = amount;
 	
 	// delete items
-	while( amount && ( idx = pc->search_inventory(sd, nameid) ) != -1 )
-	{
+	while (amount && (idx = pc->search_inventory(sd, nameid)) != INDEX_NOT_FOUND) {
 		int delamount = ( amount < sd->status.inventory[idx].amount ) ? amount : sd->status.inventory[idx].amount;
 		
 		if( sd->inventory_data[idx]->type == IT_PETEGG && sd->status.inventory[idx].card[0] == CARD0_PET )
@@ -8468,7 +8433,7 @@ ACMD(set) {
 		if( is_str )
 			script->set_var(sd, reg, (void*) val);
 		else
-			script->set_var(sd, reg, (void*)__64BPTRSIZE((atoi(val))));
+			script->set_var(sd, reg, (void*)h64BPTRSIZE((atoi(val))));
 		
 	}
 	
@@ -8674,7 +8639,7 @@ ACMD(join) {
 	struct hChSysCh *channel = NULL;
 	char name[HCHSYS_NAME_LENGTH], pass[HCHSYS_NAME_LENGTH];
 	
-	if( !message || !*message || sscanf(message, "%s %s", name, pass) < 1 ) {
+	if (!message || !*message || sscanf(message, "%19s %19s", name, pass) < 1) {
 		sprintf(atcmd_output, msg_txt(1399),command); // Unknown Channel (usage: %s <#channel_name>)
 		clif->message(fd, atcmd_output);
 		return false;
@@ -8682,7 +8647,7 @@ ACMD(join) {
 	if( hChSys.local && strcmpi(name + 1, hChSys.local_name) == 0 ) {
 		if( !map->list[sd->bl.m].channel ) {
 			clif->chsys_mjoin(sd);
-			if( map->list[sd->bl.m].channel ) /* mjoin might have refused, map has chatting capabilities disabled */
+			if( map->list[sd->bl.m].channel ) /* join might have refused, map has chatting capabilities disabled */
 				return true;
 		} else
 			channel = map->list[sd->bl.m].channel;
@@ -8801,24 +8766,25 @@ ACMD(channel) {
 	unsigned char k = 0;
 	sub1[0] = sub2[0] = sub3[0] = '\0';
 	
-	if( !message || !*message || sscanf(message, "%s %s %s %s", subcmd, sub1, sub2, sub3) < 1 ) {
+	if (!message || !*message || sscanf(message, "%19s %19s %19s %19s", subcmd, sub1, sub2, sub3) < 1) {
 		atcmd_channel_help(fd,command,( hChSys.allow_user_channel_creation || pc_has_permission(sd, PC_PERM_HCHSYS_ADMIN) ));
 		return true;
 	}
 	
-	if( strcmpi(subcmd,"create") == 0 && ( hChSys.allow_user_channel_creation || pc_has_permission(sd, PC_PERM_HCHSYS_ADMIN) ) ) {
-		if( sub1[0] != '#' ) {
+	if (strcmpi(subcmd,"create") == 0 && (hChSys.allow_user_channel_creation || pc_has_permission(sd, PC_PERM_HCHSYS_ADMIN))) {
+		// sub1 = channel name; sub2 = password; sub3 = unused
+		if (sub1[0] != '#') {
 			clif->message(fd, msg_txt(1405));// Channel name must start with a '#'
 			return false;
-		} else if ( strlen(sub1) < 3 || strlen(sub1) > HCHSYS_NAME_LENGTH ) {
+		} else if (strlen(sub1) < 3 || strlen(sub1) > HCHSYS_NAME_LENGTH) {
 			sprintf(atcmd_output, msg_txt(1406), HCHSYS_NAME_LENGTH);// Channel length must be between 3 and %d
 			clif->message(fd, atcmd_output);
 			return false;
-		} else if ( sub3[0] != '\0' ) {
+		} else if (sub3[0] != '\0') {
 			clif->message(fd, msg_txt(1408)); // Channel password may not contain spaces
 			return false;
 		}
-		if( strcmpi(sub1 + 1,hChSys.local_name) == 0 || strcmpi(sub1 + 1,hChSys.ally_name) == 0 || strdb_exists(clif->channel_db, sub1 + 1) ) {
+		if (strcmpi(sub1 + 1,hChSys.local_name) == 0 || strcmpi(sub1 + 1,hChSys.ally_name) == 0 || strdb_exists(clif->channel_db, sub1 + 1)) {
 			sprintf(atcmd_output, msg_txt(1407), sub1);// Channel '%s' is not available
 			clif->message(fd, atcmd_output);
 			return false;
@@ -8837,11 +8803,11 @@ ACMD(channel) {
 		}
 		
 		clif->chsys_join(channel,sd);
-		
-	} else if ( strcmpi(subcmd,"list") == 0 ) {
-		if( sub1[0] != '\0' && strcmpi(sub1,"colors") == 0 ) {
+	} else if (strcmpi(subcmd,"list") == 0) {
+		// sub1 = list type; sub2 = unused; sub3 = unused
+		if (sub1[0] != '\0' && strcmpi(sub1,"colors") == 0) {
 			char mout[40];
-			for( k = 0; k < hChSys.colors_count; k++ ) {
+			for (k = 0; k < hChSys.colors_count; k++) {
 				unsigned short msg_len = 1;
 				msg_len += sprintf(mout, "[ %s list colors ] : %s",command,hChSys.colors_name[k]);
 				
@@ -8857,48 +8823,48 @@ ACMD(channel) {
 			DBIterator *iter = db_iterator(clif->channel_db);
 			bool show_all = pc_has_permission(sd, PC_PERM_HCHSYS_ADMIN) ? true : false;
 			clif->message(fd, msg_txt(1410)); // -- Public Channels
-			if( hChSys.local ) {
+			if (hChSys.local) {
 				sprintf(atcmd_output, msg_txt(1409), hChSys.local_name, map->list[sd->bl.m].channel ? db_size(map->list[sd->bl.m].channel->users) : 0);// - #%s ( %d users )
 				clif->message(fd, atcmd_output);
 			}
-			if( hChSys.ally && sd->status.guild_id ) {
+			if (hChSys.ally && sd->status.guild_id) {
 				struct guild *g = sd->guild;
 				if( !g ) { dbi_destroy(iter); return false; }
 				sprintf(atcmd_output, msg_txt(1409), hChSys.ally_name, db_size(g->channel->users));// - #%s ( %d users )
 				clif->message(fd, atcmd_output);
 			}
-			for(channel = dbi_first(iter); dbi_exists(iter); channel = dbi_next(iter)) {
-				if( show_all || channel->type == hChSys_PUBLIC || channel->type == hChSys_IRC ) {
+			for (channel = dbi_first(iter); dbi_exists(iter); channel = dbi_next(iter)) {
+				if (show_all || channel->type == hChSys_PUBLIC || channel->type == hChSys_IRC) {
 					sprintf(atcmd_output, msg_txt(1409), channel->name, db_size(channel->users));// - #%s ( %d users )
 					clif->message(fd, atcmd_output);
 				}
 			}
 			dbi_destroy(iter);
 		}
-	} else if ( strcmpi(subcmd,"setcolor") == 0 ) {
-		
-		if( sub1[0] != '#' ) {
+	} else if (strcmpi(subcmd,"setcolor") == 0) {
+		// sub1 = channel name; sub2 = color; sub3 = unused
+		if (sub1[0] != '#') {
 			clif->message(fd, msg_txt(1405));// Channel name must start with a '#'
 			return false;
 		}
 		
-		if( !(channel = strdb_get(clif->channel_db, sub1 + 1)) ) {
+		if (!(channel = strdb_get(clif->channel_db, sub1 + 1))) {
 			sprintf(atcmd_output, msg_txt(1407), sub1);// Channel '%s' is not available
 			clif->message(fd, atcmd_output);
 			return false;
 		}
 		
-		if( channel->owner != sd->status.char_id && !pc_has_permission(sd, PC_PERM_HCHSYS_ADMIN) ) {
+		if (channel->owner != sd->status.char_id && !pc_has_permission(sd, PC_PERM_HCHSYS_ADMIN)) {
 			sprintf(atcmd_output, msg_txt(1412), sub1);// You're not the owner of channel '%s'
 			clif->message(fd, atcmd_output);
 			return false;
 		}
 		
-		for( k = 0; k < hChSys.colors_count; k++ ) {
-			if( strcmpi(sub2,hChSys.colors_name[k]) == 0 )
+		for (k = 0; k < hChSys.colors_count; k++) {
+			if (strcmpi(sub2, hChSys.colors_name[k]) == 0)
 				break;
 		}
-		if( k == hChSys.colors_count ) {
+		if (k == hChSys.colors_count) {
 			sprintf(atcmd_output, msg_txt(1411), sub2);// Unknown color '%s'
 			clif->message(fd, atcmd_output);
 			return false;
@@ -8906,110 +8872,113 @@ ACMD(channel) {
 		channel->color = k;
 		sprintf(atcmd_output, msg_txt(1413),sub1,hChSys.colors_name[k]);// '%s' channel color updated to '%s'
 		clif->message(fd, atcmd_output);
-	} else if ( strcmpi(subcmd,"leave") == 0 ) {
-		
-		if( sub1[0] != '#' ) {
+	} else if (strcmpi(subcmd,"leave") == 0) {
+		// sub1 = channel name; sub2 = unused; sub3 = unused
+		if (sub1[0] != '#') {
 			clif->message(fd, msg_txt(1405));// Channel name must start with a '#'
 			return false;
 		}
-		for(k = 0; k < sd->channel_count; k++) {
-			if( strcmpi(sub1+1,sd->channels[k]->name) == 0 )
+		for (k = 0; k < sd->channel_count; k++) {
+			if (strcmpi(sub1+1,sd->channels[k]->name) == 0)
 				break;
 		}
-		if( k == sd->channel_count ) {
+		if (k == sd->channel_count) {
 			sprintf(atcmd_output, msg_txt(1425),sub1);// You're not part of the '%s' channel
 			clif->message(fd, atcmd_output);
 			return false;
 		}
-		if( sd->channels[k]->type == hChSys_ALLY ) {
+		if (sd->channels[k]->type == hChSys_ALLY) {
 			do {
-				for(k = 0; k < sd->channel_count; k++) {
-					if( sd->channels[k]->type == hChSys_ALLY ) {
+				for (k = 0; k < sd->channel_count; k++) {
+					if (sd->channels[k]->type == hChSys_ALLY) {
 						clif->chsys_left(sd->channels[k],sd);
 						break;
 					}
 				}
-			} while( k != sd->channel_count );
-		} else
+			} while (k != sd->channel_count);
+		} else {
 			clif->chsys_left(sd->channels[k],sd);
+		}
 		sprintf(atcmd_output, msg_txt(1426),sub1); // You've left the '%s' channel
 		clif->message(fd, atcmd_output);
-	} else if ( strcmpi(subcmd,"bindto") == 0 ) {
-		
-		if( sub1[0] != '#' ) {
+	} else if (strcmpi(subcmd,"bindto") == 0) {
+		// sub1 = channel name; sub2 = unused; sub3 = unused
+		if (sub1[0] != '#') {
 			clif->message(fd, msg_txt(1405));// Channel name must start with a '#'
 			return false;
 		}
 		
-		for(k = 0; k < sd->channel_count; k++) {
-			if( strcmpi(sub1+1,sd->channels[k]->name) == 0 )
+		for (k = 0; k < sd->channel_count; k++) {
+			if (strcmpi(sub1+1,sd->channels[k]->name) == 0)
 				break;
 		}
-		if( k == sd->channel_count ) {
+		if (k == sd->channel_count) {
 			sprintf(atcmd_output, msg_txt(1425),sub1);// You're not part of the '%s' channel
 			clif->message(fd, atcmd_output);
 			return false;
 		}
 		
 		sd->gcbind = sd->channels[k];
-		sprintf(atcmd_output, msg_txt(1431),sub1); // Your global chat is now binded to the '%s' channel
+		sprintf(atcmd_output, msg_txt(1431),sub1); // Your global chat is now bound to the '%s' channel
 		clif->message(fd, atcmd_output);
-	} else if ( strcmpi(subcmd,"unbind") == 0 ) {
-		
-		if( sd->gcbind == NULL ) {
-			clif->message(fd, msg_txt(1432));// Your global chat is not binded to any channel
+	} else if (strcmpi(subcmd,"unbind") == 0) {
+		// sub1 = unused; sub2 = unused; sub3 = unused
+		if (sd->gcbind == NULL) {
+			clif->message(fd, msg_txt(1432));// Your global chat is not bound to any channel
 			return false;
 		}
 		
-		sprintf(atcmd_output, msg_txt(1433),sd->gcbind->name); // Your global chat is now unbinded from the '#%s' channel
+		sprintf(atcmd_output, msg_txt(1433),sd->gcbind->name); // Your global chat is no longer bound to the '#%s' channel
 		clif->message(fd, atcmd_output);
 		
 		sd->gcbind = NULL;
-	} else if ( strcmpi(subcmd,"ban") == 0 ) {
+	} else if (strcmpi(subcmd,"ban") == 0) {
+		// sub1 = channel name; sub2 = unused; sub3 = unused
 		struct map_session_data *pl_sd = NULL;
 		struct hChSysBanEntry *entry = NULL;
+		char sub4[NAME_LENGTH]; ///< player name
 		
-		if( sub1[0] != '#' ) {
+		if (sub1[0] != '#') {
 			clif->message(fd, msg_txt(1405));// Channel name must start with a '#'
 			return false;
 		}
 		
-		if( !(channel = strdb_get(clif->channel_db, sub1 + 1)) ) {
+		if (!(channel = strdb_get(clif->channel_db, sub1 + 1))) {
 			sprintf(atcmd_output, msg_txt(1407), sub1);// Channel '%s' is not available
 			clif->message(fd, atcmd_output);
 			return false;
 		}
 		
-		if( channel->owner != sd->status.char_id && !pc_has_permission(sd, PC_PERM_HCHSYS_ADMIN) ) {
+		if (channel->owner != sd->status.char_id && !pc_has_permission(sd, PC_PERM_HCHSYS_ADMIN)) {
 			sprintf(atcmd_output, msg_txt(1412), sub1);// You're not the owner of channel '%s'
 			clif->message(fd, atcmd_output);
 			return false;
 		}
 		
-		if (!message || !*message || sscanf(message, "%s %s %24[^\n]", subcmd, sub1, sub2) < 1) {
-			sprintf(atcmd_output, msg_txt(1434), sub2);// Player '%s' was not found
+		if (!message || !*message || sscanf(message, "%19s %19s %23[^\n]", subcmd, sub1, sub4) < 3) {
+			sprintf(atcmd_output, msg_txt(1434), sub4);// Player '%s' was not found
 			clif->message(fd, atcmd_output);
 			return false;
 		}
 
-		if( sub2[0] == '\0' || ( pl_sd = map->nick2sd(sub2) ) == NULL ) {
-			sprintf(atcmd_output, msg_txt(1434), sub2);// Player '%s' was not found
+		if (sub4[0] == '\0' || (pl_sd = map->nick2sd(sub4)) == NULL) {
+			sprintf(atcmd_output, msg_txt(1434), sub4);// Player '%s' was not found
 			clif->message(fd, atcmd_output);
 			return false;
 		 }
 		
-		if( pc_has_permission(pl_sd, PC_PERM_HCHSYS_ADMIN) ) {
+		if (pc_has_permission(pl_sd, PC_PERM_HCHSYS_ADMIN)) {
 			clif->message(fd, msg_txt(1464)); // Ban failed, not possible to ban this user.
 			return false;
 		}
 		
-		if( channel->banned && idb_exists(channel->banned,pl_sd->status.account_id) ) {
+		if (channel->banned && idb_exists(channel->banned,pl_sd->status.account_id)) {
 			sprintf(atcmd_output, msg_txt(1465), pl_sd->status.name);// Player '%s' is already banned from this channel
 			clif->message(fd, atcmd_output);
 			return false;
 		}
 		
-		if( !channel->banned )
+		if (!channel->banned)
 			channel->banned = idb_alloc(DB_OPT_BASE|DB_OPT_ALLOW_NULL_DATA|DB_OPT_RELEASE_DATA);
 		
 		CREATE(entry, struct hChSysBanEntry, 1);
@@ -9022,39 +8991,47 @@ ACMD(channel) {
 		
 		sprintf(atcmd_output, msg_txt(1437),pl_sd->status.name,sub1); // Player '%s' has now been banned from '%s' channel
 		clif->message(fd, atcmd_output);
-	} else if ( strcmpi(subcmd,"unban") == 0 ) {
+	} else if (strcmpi(subcmd,"unban") == 0) {
+		// sub1 = channel name; sub2 = unused; sub3 = unused
 		struct map_session_data *pl_sd = NULL;
+		char sub4[NAME_LENGTH]; ///< player name
 		
-		if( sub1[0] != '#' ) {
+		if (sub1[0] != '#') {
 			clif->message(fd, msg_txt(1405));// Channel name must start with a '#'
 			return false;
 		}
 		
-		if( !(channel = strdb_get(clif->channel_db, sub1 + 1)) ) {
+		if (!(channel = strdb_get(clif->channel_db, sub1 + 1))) {
 			sprintf(atcmd_output, msg_txt(1407), sub1);// Channel '%s' is not available
 			clif->message(fd, atcmd_output);
 			return false;
 		}
 		
-		if( channel->owner != sd->status.char_id && !pc_has_permission(sd, PC_PERM_HCHSYS_ADMIN) ) {
+		if (channel->owner != sd->status.char_id && !pc_has_permission(sd, PC_PERM_HCHSYS_ADMIN)) {
 			sprintf(atcmd_output, msg_txt(1412), sub1);// You're not the owner of channel '%s'
 			clif->message(fd, atcmd_output);
 			return false;
 		}
 		
-		if( !channel->banned ) {
+		if (!channel->banned) {
 			sprintf(atcmd_output, msg_txt(1439), sub1);// Channel '%s' has no banned players
 			clif->message(fd, atcmd_output);
 			return false;
 		}
 		
-		if( sub2[0] == '\0' || ( pl_sd = map->nick2sd(sub2) ) == NULL ) {
-			sprintf(atcmd_output, msg_txt(1434), sub2);// Player '%s' was not found
+		if (!message || !*message || sscanf(message, "%19s %19s %23[^\n]", subcmd, sub1, sub4) < 3) {
+			sprintf(atcmd_output, msg_txt(1434), sub4);// Player '%s' was not found
+			clif->message(fd, atcmd_output);
+			return false;
+		}
+
+		if (sub4[0] == '\0' || (pl_sd = map->nick2sd(sub4)) == NULL) {
+			sprintf(atcmd_output, msg_txt(1434), sub4);// Player '%s' was not found
 			clif->message(fd, atcmd_output);
 			return false;
 		}
 		
-		if( !idb_exists(channel->banned,pl_sd->status.account_id) ) {
+		if (!idb_exists(channel->banned,pl_sd->status.account_id)) {
 			sprintf(atcmd_output, msg_txt(1440), pl_sd->status.name);// Player '%s' is not banned from this channel
 			clif->message(fd, atcmd_output);
 			return false;
@@ -9062,32 +9039,33 @@ ACMD(channel) {
 		
 		idb_remove(channel->banned, pl_sd->status.account_id);
 		
-		if( !db_size(channel->banned) ) {
+		if (!db_size(channel->banned)) {
 			db_destroy(channel->banned);
 			channel->banned = NULL;
 		}
 		
 		sprintf(atcmd_output, msg_txt(1441),pl_sd->status.name,sub1); // Player '%s' has now been unbanned from the '%s' channel
 		clif->message(fd, atcmd_output);
-	} else if ( strcmpi(subcmd,"unbanall") == 0 ) {
-		if( sub1[0] != '#' ) {
+	} else if (strcmpi(subcmd,"unbanall") == 0) {
+		// sub1 = channel name; sub2 = unused; sub3 = unused
+		if (sub1[0] != '#') {
 			clif->message(fd, msg_txt(1405));// Channel name must start with a '#'
 			return false;
 		}
 		
-		if( !(channel = strdb_get(clif->channel_db, sub1 + 1)) ) {
+		if (!(channel = strdb_get(clif->channel_db, sub1 + 1))) {
 			sprintf(atcmd_output, msg_txt(1407), sub1);// Channel '%s' is not available
 			clif->message(fd, atcmd_output);
 			return false;
 		}
 		
-		if( channel->owner != sd->status.char_id && !pc_has_permission(sd, PC_PERM_HCHSYS_ADMIN) ) {
+		if (channel->owner != sd->status.char_id && !pc_has_permission(sd, PC_PERM_HCHSYS_ADMIN)) {
 			sprintf(atcmd_output, msg_txt(1412), sub1);// You're not the owner of channel '%s'
 			clif->message(fd, atcmd_output);
 			return false;
 		}
 		
-		if( !channel->banned ) {
+		if (!channel->banned) {
 			sprintf(atcmd_output, msg_txt(1439), sub1);// Channel '%s' has no banned players
 			clif->message(fd, atcmd_output);
 			return false;
@@ -9098,29 +9076,30 @@ ACMD(channel) {
 		
 		sprintf(atcmd_output, msg_txt(1442),sub1); // Removed all bans from '%s' channel
 		clif->message(fd, atcmd_output);
-	} else if ( strcmpi(subcmd,"banlist") == 0 ) {
+	} else if (strcmpi(subcmd,"banlist") == 0) {
+		// sub1 = channel name; sub2 = unused; sub3 = unused
 		DBIterator *iter = NULL;
 		DBKey key;
 		DBData *data;
 		bool isA = pc_has_permission(sd, PC_PERM_HCHSYS_ADMIN)?true:false;
-		if( sub1[0] != '#' ) {
+		if (sub1[0] != '#') {
 			clif->message(fd, msg_txt(1405));// Channel name must start with a '#'
 			return false;
 		}
 		
-		if( !(channel = strdb_get(clif->channel_db, sub1 + 1)) ) {
+		if (!(channel = strdb_get(clif->channel_db, sub1 + 1))) {
 			sprintf(atcmd_output, msg_txt(1407), sub1);// Channel '%s' is not available
 			clif->message(fd, atcmd_output);
 			return false;
 		}
 		
-		if( channel->owner != sd->status.char_id && !isA ) {
+		if (channel->owner != sd->status.char_id && !isA) {
 			sprintf(atcmd_output, msg_txt(1412), sub1);// You're not the owner of channel '%s'
 			clif->message(fd, atcmd_output);
 			return false;
 		}
 		
-		if( !channel->banned ) {
+		if (!channel->banned) {
 			sprintf(atcmd_output, msg_txt(1439), sub1);// Channel '%s' has no banned players
 			clif->message(fd, atcmd_output);
 			return false;
@@ -9130,10 +9109,10 @@ ACMD(channel) {
 		
 		iter = db_iterator(channel->banned);
 		
-		for( data = iter->first(iter,&key); iter->exists(iter); data = iter->next(iter,&key) ) {
+		for (data = iter->first(iter,&key); iter->exists(iter); data = iter->next(iter,&key)) {
 			struct hChSysBanEntry * entry = DB->data2ptr(data);
 			
-			if( !isA )
+			if (!isA)
 				sprintf(atcmd_output, msg_txt(1444), entry->name);// - %s %s
 			else
 				sprintf(atcmd_output, msg_txt(1445), entry->name, key.i);// - %s (%d)
@@ -9143,57 +9122,58 @@ ACMD(channel) {
 		
 		dbi_destroy(iter);
 		
-	} else if ( strcmpi(subcmd,"setopt") == 0 ) {
+	} else if (strcmpi(subcmd,"setopt") == 0) {
+		// sub1 = channel name; sub2 = option name; sub3 = value
 		const char* opt_str[3] = {
 			"None",
 			"JoinAnnounce",
 			"MessageDelay",
 		};
 		
-		if( sub1[0] != '#' ) {
+		if (sub1[0] != '#') {
 			clif->message(fd, msg_txt(1405));// Channel name must start with a '#'
 			return false;
 		}
 		
-		if( !(channel = strdb_get(clif->channel_db, sub1 + 1)) ) {
+		if (!(channel = strdb_get(clif->channel_db, sub1 + 1))) {
 			sprintf(atcmd_output, msg_txt(1407), sub1);// Channel '%s' is not available
 			clif->message(fd, atcmd_output);
 			return false;
 		}
 		
-		if( channel->owner != sd->status.char_id && !pc_has_permission(sd, PC_PERM_HCHSYS_ADMIN) ) {
+		if (channel->owner != sd->status.char_id && !pc_has_permission(sd, PC_PERM_HCHSYS_ADMIN)) {
 			sprintf(atcmd_output, msg_txt(1412), sub1);// You're not the owner of channel '%s'
 			clif->message(fd, atcmd_output);
 			return false;
 		}
 		
-		if( sub2[0] == '\0' ) {
+		if (sub2[0] == '\0') {
 			clif->message(fd, msg_txt(1446));// You need to input a option
 			return false;
 		}
 		
-		for( k = 1; k < 3; k++ ) {
-			if( strcmpi(sub2,opt_str[k]) == 0 )
+		for (k = 1; k < 3; k++) {
+			if (strcmpi(sub2,opt_str[k]) == 0)
 				break;
 		}
 		
-		if( k == 3 ) {
+		if (k == 3) {
 			sprintf(atcmd_output, msg_txt(1447), sub2);// '%s' is not a known channel option
 			clif->message(fd, atcmd_output);
 			clif->message(fd, msg_txt(1448)); // -- Available options
-			for( k = 1; k < 3; k++ ) {
+			for (k = 1; k < 3; k++) {
 				sprintf(atcmd_output, msg_txt(1444), opt_str[k]);// - '%s'
 				clif->message(fd, atcmd_output);
 			}
 			return false;
 		}
 		
-		if( sub3[0] == '\0' ) {
-			if ( k == hChSys_OPT_MSG_DELAY ) {
+		if (sub3[0] == '\0') {
+			if (k == hChSys_OPT_MSG_DELAY) {
 				sprintf(atcmd_output, msg_txt(1466), opt_str[k]);// For '%s' you need the amount of seconds (from 0 to 10)
 				clif->message(fd, atcmd_output);
 				return false;
-			} else if( channel->opt & k ) {
+			} else if (channel->opt & k) {
 				sprintf(atcmd_output, msg_txt(1449), opt_str[k],opt_str[k]); // option '%s' is already enabled, if you'd like to disable it type '@channel setopt %s 0'
 				clif->message(fd, atcmd_output);
 				return false;
@@ -9205,13 +9185,13 @@ ACMD(channel) {
 			}
 		} else {
 			int v = atoi(sub3);
-			if( k == hChSys_OPT_MSG_DELAY ) {
-				if( v < 0 || v > 10 ) {
+			if (k == hChSys_OPT_MSG_DELAY) {
+				if (v < 0 || v > 10) {
 					sprintf(atcmd_output, msg_txt(1451), v, opt_str[k]);// value '%d' for option '%s' is out of range (limit is 0-10)
 					clif->message(fd, atcmd_output);
 					return false;
 				}
-				if( v == 0 ) {
+				if (v == 0) {
 					channel->opt &=~ k;
 					channel->msg_delay = 0;
 					sprintf(atcmd_output, msg_txt(1453), opt_str[k],channel->name,v);// option '%s' is now disabled for channel '%s'
@@ -9225,8 +9205,8 @@ ACMD(channel) {
 					return true;
 				}
 			} else {
-				if( v ) {
-					if( channel->opt & k ) {
+				if (v) {
+					if (channel->opt & k) {
 						sprintf(atcmd_output, msg_txt(1449), opt_str[k],opt_str[k]); // option '%s' is already enabled, if you'd like to disable it type '@channel opt %s 0'
 						clif->message(fd, atcmd_output);
 						return false;
@@ -9236,7 +9216,7 @@ ACMD(channel) {
 						clif->message(fd, atcmd_output);
 					}
 				} else {
-					if( !(channel->opt & k) ) {
+					if (!(channel->opt & k)) {
 						sprintf(atcmd_output, msg_txt(1454), opt_str[k],channel->name); // option '%s' is not enabled on channel '%s'
 						clif->message(fd, atcmd_output);
 						return false;
@@ -9250,7 +9230,6 @@ ACMD(channel) {
 			}
 			
 		}
-		
 	} else {
 		atcmd_channel_help(fd,command,( hChSys.allow_user_channel_creation || pc_has_permission(sd, PC_PERM_HCHSYS_ADMIN) ));
 	}
@@ -10085,7 +10064,7 @@ void atcommand_config_read(const char* config_filename) {
 			}
 			commandinfo->log = false;
 		}
-	}	
+	}
 	
 	// Commands help
 	// We only check if all commands exist
@@ -10132,7 +10111,7 @@ static inline int AtCommandType2idx(AtCommandType type) { return (type-1); }
 
 /**
  * Loads permissions for groups to use commands.
- * 
+ *
  */
 void atcommand_db_load_groups(GroupSettings **groups, config_setting_t **commands_, size_t sz)
 {
@@ -10156,7 +10135,7 @@ void atcommand_db_load_groups(GroupSettings **groups, config_setting_t **command
 
 			idx = pcg->get_idx(group);
 			if (idx < 0 || idx >= sz) {
-				ShowError("atcommand_db_load_groups: index (%d) out of bounds [0,%d]\n", idx, sz - 1);
+				ShowError("atcommand_db_load_groups: index (%d) out of bounds [0,%"PRIuS"]\n", idx, sz - 1);
 				continue;
 			}
 			

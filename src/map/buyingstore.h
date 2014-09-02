@@ -2,8 +2,13 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#ifndef _MAP_BUYINGSTORE_H_
-#define _MAP_BUYINGSTORE_H_
+#ifndef MAP_BUYINGSTORE_H
+#define MAP_BUYINGSTORE_H
+
+#include "../common/cbasetypes.h"
+#include "../common/mmo.h" // MAX_SLOTS
+
+struct map_session_data;
 
 /**
  * Declarations
@@ -74,4 +79,4 @@ struct buyingstore_interface *buyingstore;
 
 void buyingstore_defaults (void);
 
-#endif  // _MAP_BUYINGSTORE_H_
+#endif  // MAP_BUYINGSTORE_H

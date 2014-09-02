@@ -2,32 +2,35 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#include "../common/mmo.h"
-#include "../common/db.h"
-#include "../common/malloc.h"
-#include "../common/strlib.h"
-#include "../common/showmsg.h"
-#include "../common/socket.h"
-#include "../common/timer.h"
-#include "char.h"
+#define HERCULES_CORE
+
 #include "inter.h"
-#include "int_party.h"
-#include "int_guild.h"
-#include "int_storage.h"
-#include "int_pet.h"
-#include "int_homun.h"
-#include "int_mercenary.h"
-#include "int_mail.h"
-#include "int_auction.h"
-#include "int_quest.h"
-#include "int_elemental.h"
 
+#include <errno.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
-
+#include <string.h>
 #include <sys/stat.h> // for stat/lstat/fstat - [Dekamaster/Ultimate GM Tool]
 
+#include "char.h"
+#include "int_auction.h"
+#include "int_elemental.h"
+#include "int_guild.h"
+#include "int_homun.h"
+#include "int_mail.h"
+#include "int_mercenary.h"
+#include "int_party.h"
+#include "int_pet.h"
+#include "int_quest.h"
+#include "int_storage.h"
+#include "../common/cbasetypes.h"
+#include "../common/db.h"
+#include "../common/malloc.h"
+#include "../common/mmo.h"
+#include "../common/showmsg.h"
+#include "../common/socket.h"
+#include "../common/strlib.h"
+#include "../common/timer.h"
 
 #define WISDATA_TTL (60*1000)	//Wis data Time To Live (60 seconds)
 #define WISDELLIST_MAX 256		// Number of elements in the list Delete data Wis
@@ -105,7 +108,7 @@ bool msg_config_read(const char *cfg_name, bool allow_override) {
 	while(fgets(line, sizeof(line), fp) ) {
 		if (line[0] == '/' && line[1] == '/')
 			continue;
-		if (sscanf(line, "%[^:]: %[^\r\n]", w1, w2) != 2)
+		if (sscanf(line, "%1023[^:]: %1023[^\r\n]", w1, w2) != 2)
 			continue;
 
 		if (strcmpi(w1, "import") == 0)
@@ -370,7 +373,11 @@ const char* job_name(int class_) {
 }
 
 /* [Dekamaster/Nightroad] */
-const char * geoip_countryname[253] = {"Unknown","Asia/Pacific Region","Europe","Andorra","United Arab Emirates","Afghanistan","Antigua and Barbuda","Anguilla","Albania","Armenia","Netherlands Antilles",
+#define GEOIP_MAX_COUNTRIES 255
+#define GEOIP_STRUCTURE_INFO_MAX_SIZE 20
+#define GEOIP_COUNTRY_BEGIN 16776960
+
+const char * geoip_countryname[GEOIP_MAX_COUNTRIES] = {"Unknown","Asia/Pacific Region","Europe","Andorra","United Arab Emirates","Afghanistan","Antigua and Barbuda","Anguilla","Albania","Armenia","Netherlands Antilles",
 		"Angola","Antarctica","Argentina","American Samoa","Austria","Australia","Aruba","Azerbaijan","Bosnia and Herzegovina","Barbados",
 		"Bangladesh","Belgium","Burkina Faso","Bulgaria","Bahrain","Burundi","Benin","Bermuda","Brunei Darussalam","Bolivia",
 		"Brazil","Bahamas","Bhutan","Bouvet Island","Botswana","Belarus","Belize","Canada","Cocos (Keeling) Islands","Congo, The Democratic Republic of the",
@@ -395,17 +402,15 @@ const char * geoip_countryname[253] = {"Unknown","Asia/Pacific Region","Europe",
 		"Tanzania, United Republic of","Ukraine","Uganda","United States Minor Outlying Islands","United States","Uruguay","Uzbekistan","Holy See (Vatican City State)","Saint Vincent and the Grenadines","Venezuela",
 		"Virgin Islands, British","Virgin Islands, U.S.","Vietnam","Vanuatu","Wallis and Futuna","Samoa","Yemen","Mayotte","Serbia","South Africa",
 		"Zambia","Montenegro","Zimbabwe","Anonymous Proxy","Satellite Provider","Other","Aland Islands","Guernsey","Isle of Man","Jersey",
-		"Saint Barthelemy","Saint Martin"};
-unsigned char *geoip_cache;
-void geoip_readdb(void){
-	struct stat bufa;
-	FILE *db=fopen("./db/GeoIP.dat","rb");
-	fstat(fileno(db), &bufa);
-	geoip_cache = (unsigned char *) malloc(sizeof(unsigned char) * bufa.st_size);
-	if(fread(geoip_cache, sizeof(unsigned char), bufa.st_size, db) != bufa.st_size) { ShowError("geoip_cache reading didn't read all elements \n"); }
-	fclose(db);
-	ShowStatus("Finished Reading "CL_GREEN"GeoIP"CL_RESET" Database.\n");
-}
+		"Saint Barthelemy", "Saint Martin", "Bonaire, Saint Eustatius and Saba", "South Sudan"};
+/**
+ * GeoIP information
+ **/
+struct s_geoip {
+	unsigned char *cache; // GeoIP.dat information see geoip_init()
+	bool active;
+} geoip;
+
 /* [Dekamaster/Nightroad] */
 /* WHY NOT A DBMAP: There are millions of entries in GeoIP and it has its own algorithm to go quickly through them, a DBMap wouldn't be efficient */
 const char* geoip_getcountry(uint32 ipnum){
@@ -414,8 +419,11 @@ const char* geoip_getcountry(uint32 ipnum){
 	const unsigned char *buf;
 	unsigned int offset = 0;
 
+	if( geoip.active == false )
+		return geoip_countryname[0];
+
 	for (depth = 31; depth >= 0; depth--) {
-		buf = geoip_cache + (long)6 *offset;
+		buf = geoip.cache + (long)6 *offset;
 		if (ipnum & (1 << depth)) {
 			/* Take the right-hand branch */
 			x =   (buf[3*1 + 0] << (0*8))
@@ -427,13 +435,97 @@ const char* geoip_getcountry(uint32 ipnum){
 				+ (buf[3*0 + 1] << (1*8))
 				+ (buf[3*0 + 2] << (2*8));
 		}
-		if (x >= 16776960) {
-			x=x-16776960;
+		if (x >= GEOIP_COUNTRY_BEGIN) {
+			x = x-GEOIP_COUNTRY_BEGIN;
+
+			if( x > GEOIP_MAX_COUNTRIES )
+				return geoip_countryname[0];
+
 			return geoip_countryname[x];
 		}
 		offset = x;
 	}
+	ShowError("geoip_getcountry(): Error traversing database for ipnum %d\n", ipnum);
+	ShowWarning("geoip_getcountry(): Possible database corruption!\n");
+
 	return geoip_countryname[0];
+}
+
+/**
+ * Disables GeoIP
+ * frees geoip.cache
+ **/
+void geoip_final(bool shutdown) {
+	if (geoip.cache) {
+		aFree(geoip.cache);
+		geoip.cache = NULL;
+	}
+
+	if (geoip.active) {
+		if (!shutdown)
+			ShowStatus("GeoIP "CL_RED"disabled"CL_RESET".\n");
+		geoip.active = false;
+	}
+}
+
+/**
+ * Reads GeoIP database and stores it into memory
+ * geoip.cache should be freed after use!
+ * http://dev.maxmind.com/geoip/legacy/geolite/
+ **/
+void geoip_init(void) {
+	int i, fno;
+	char db_type = 1;
+	unsigned char delim[3];
+	struct stat bufa;
+	FILE *db;
+
+	geoip.active = true;
+
+	db = fopen("./db/GeoIP.dat","rb");
+	if( db == NULL ) {
+		ShowError("geoip_readdb: Error reading GeoIP.dat!\n");
+		geoip_final(false);
+		return;
+	}
+	fno = fileno(db);
+	if( fstat(fno, &bufa) < 0 ) {
+		ShowError("geoip_readdb: Error stating GeoIP.dat! Error %d\n", errno);
+		geoip_final(false);
+		return;
+	}
+	geoip.cache = aMalloc( (sizeof(geoip.cache) * bufa.st_size) );
+	if( fread(geoip.cache, sizeof(unsigned char), bufa.st_size, db) != bufa.st_size ) {
+		ShowError("geoip_cache: Couldn't read all elements!\n");
+		fclose(db);
+		geoip_final(false);
+		return;
+	}
+
+	// Search database type
+	fseek(db, -3l, SEEK_END);
+	for( i = 0; i < GEOIP_STRUCTURE_INFO_MAX_SIZE; i++ ) {
+		fread(delim, sizeof(delim[0]), 3, db);
+		if( delim[0] == 255 && delim[1] == 255 && delim[2] == 255 ) {
+			fread(&db_type, sizeof(db_type), 1, db);
+			break;
+		} else {
+			fseek(db, -4l, SEEK_CUR);
+		}
+	}
+	
+	fclose(db);
+
+	if( db_type != 1 ) {
+		if( db_type )
+			ShowError("geoip_init(): Database type is not supported %d!\n", db_type);
+		else
+			ShowError("geoip_init(): GeoIP is corrupted!\n");
+
+		geoip_final(false);
+		return;
+	}
+	ShowStatus("Finished Reading "CL_GREEN"GeoIP"CL_RESET" Database.\n");
 }
 
 /**
@@ -471,7 +563,8 @@ void inter_vmsg_to_fd(int fd, int u_fd, int aid, char* msg, va_list ap) {
  * @param msg  Message format string
  * @param ...  Additional parameters for (v)sprinf
  */
-void inter_msg_to_fd(int fd, int u_fd, int aid, char* msg, ...) {
+void inter_msg_to_fd(int fd, int u_fd, int aid, char *msg, ...) __attribute__((format(printf, 4, 5)));
+void inter_msg_to_fd(int fd, int u_fd, int aid, char *msg, ...) {
 	va_list ap;
 	va_start(ap,msg);
 	inter_vmsg_to_fd(fd, u_fd, aid, msg, ap);
@@ -498,7 +591,7 @@ void mapif_parse_accinfo(int fd) {
 				inter_msg_to_fd(fd, u_fd, aid, "No matches were found for your criteria, '%s'",query);
 			} else {
 				Sql_ShowDebug(sql_handle);
-				inter_msg_to_fd(fd, u_fd, aid, "An error occured, bother your admin about it.");
+				inter_msg_to_fd(fd, u_fd, aid, "An error occurred, bother your admin about it.");
 			}
 			SQL->FreeResult(sql_handle);
 			return;
@@ -567,7 +660,7 @@ void mapif_parse_accinfo2(bool success, int map_fd, int u_fd, int u_aid, int acc
 		if (SQL->NumRows(sql_handle) == 0) {
 			inter_msg_to_fd(map_fd, u_fd, u_aid, "This account doesn't have characters.");
 		} else {
-			inter_msg_to_fd(map_fd, u_fd, u_aid, "An error occured, bother your admin about it.");
+			inter_msg_to_fd(map_fd, u_fd, u_aid, "An error occurred, bother your admin about it.");
 			Sql_ShowDebug(sql_handle);
 		}
 	} else {
@@ -826,9 +919,8 @@ static int inter_config_read(const char* cfgName)
 		return 1;
 	}
 
-	while(fgets(line, sizeof(line), fp))
-	{
-		i = sscanf(line, "%[^:]: %[^\r\n]", w1, w2);
+	while (fgets(line, sizeof(line), fp)) {
+		i = sscanf(line, "%1023[^:]: %1023[^\r\n]", w1, w2);
 		if(i != 2)
 			continue;
 
@@ -934,7 +1026,7 @@ int inter_init_sql(const char *file)
 	inter_mail_sql_init();
 	inter_auction_sql_init();
 
-	geoip_readdb();
+	geoip_init();
 	msg_config_read("conf/messages.conf", false);
 	return 0;
 }
@@ -954,6 +1046,7 @@ void inter_final(void)
 	inter_mail_sql_final();
 	inter_auction_sql_final();
 
+	geoip_final(true);
 	do_final_msg();
 	return;
 }
@@ -1073,7 +1166,7 @@ int check_ttl_wisdata(void)
 			struct WisData *wd = (struct WisData*)idb_get(wis_db, wis_dellist[i]);
 			ShowWarning("inter: wis data id=%d time out : from %s to %s\n", wd->id, wd->src, wd->dst);
 			// removed. not send information after a timeout. Just no answer for the player
-			//mapif_wis_end(wd, 1); // flag: 0: success to send wisper, 1: target character is not loged in?, 2: ignored by target
+			//mapif_wis_end(wd, 1); // flag: 0: success to send whisper, 1: target character is not logged in?, 2: ignored by target
 			idb_remove(wis_db, wd->id);
 		}
 	} while(wis_delnum >= WISDELLIST_MAX);
@@ -1107,7 +1200,7 @@ int mapif_parse_WisRequest(int fd)
 	if (RFIFOW(fd,2)-52 >= sizeof(wd->msg)) {
 		ShowWarning("inter: Wis message size too long.\n");
 		return 0;
-	} else if (RFIFOW(fd,2)-52 <= 0) { // normaly, impossible, but who knows...
+	} else if (RFIFOW(fd,2)-52 <= 0) { // normally, impossible, but who knows...
 		ShowError("inter: Wis message doesn't exist.\n");
 		return 0;
 	}
@@ -1124,7 +1217,7 @@ int mapif_parse_WisRequest(int fd)
 		unsigned char buf[27];
 		WBUFW(buf, 0) = 0x3802;
 		memcpy(WBUFP(buf, 2), RFIFOP(fd, 4), NAME_LENGTH);
-		WBUFB(buf,26) = 1; // flag: 0: success to send wisper, 1: target character is not loged in?, 2: ignored by target
+		WBUFB(buf,26) = 1; // flag: 0: success to send whisper, 1: target character is not logged in?, 2: ignored by target
 		mapif_send(fd, buf, 27);
 	}
 	else
@@ -1139,7 +1232,7 @@ int mapif_parse_WisRequest(int fd)
 			uint8 buf[27];
 			WBUFW(buf, 0) = 0x3802;
 			memcpy(WBUFP(buf, 2), RFIFOP(fd, 4), NAME_LENGTH);
-			WBUFB(buf,26) = 1; // flag: 0: success to send wisper, 1: target character is not loged in?, 2: ignored by target
+			WBUFB(buf,26) = 1; // flag: 0: success to send whisper, 1: target character is not logged in?, 2: ignored by target
 			mapif_send(fd, buf, 27);
 		}
 		else
@@ -1180,7 +1273,7 @@ int mapif_parse_WisReply(int fd)
 		return 0;	// This wisp was probably suppress before, because it was timeout of because of target was found on another map-server
 
 	if ((--wd->count) <= 0 || flag != 1) {
-		mapif_wis_end(wd, flag); // flag: 0: success to send wisper, 1: target character is not loged in?, 2: ignored by target
+		mapif_wis_end(wd, flag); // flag: 0: success to send whisper, 1: target character is not logged in?, 2: ignored by target
 		idb_remove(wis_db, id);
 	}
 
@@ -1284,8 +1377,8 @@ int mapif_parse_NameChangeRequest(int fd)
 	type = RFIFOB(fd,10);
 	name = (char*)RFIFOP(fd,11);
 
-	// Check Authorised letters/symbols in the name
-	if (char_name_option == 1) { // only letters/symbols in char_name_letters are authorised
+	// Check Authorized letters/symbols in the name
+	if (char_name_option == 1) { // only letters/symbols in char_name_letters are authorized
 		for (i = 0; i < NAME_LENGTH && name[i]; i++)
 		if (strchr(char_name_letters, name[i]) == NULL) {
 			mapif_namechange_ack(fd, account_id, char_id, type, 0, name);

@@ -2,6 +2,18 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
+#define HERCULES_CORE
+
+#include "login.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "account.h"
+#include "ipban.h"
+#include "loginlog.h"
+#include "../common/HPM.h"
 #include "../common/core.h"
 #include "../common/db.h"
 #include "../common/malloc.h"
@@ -12,15 +24,6 @@
 #include "../common/strlib.h"
 #include "../common/timer.h"
 #include "../common/utils.h"
-#include "../common/HPM.h"
-#include "account.h"
-#include "ipban.h"
-#include "login.h"
-#include "loginlog.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 struct Login_Config login_config;
 
@@ -170,7 +173,7 @@ static int online_data_cleanup_sub(DBKey key, DBData *data, va_list ap)
 static int online_data_cleanup(int tid, int64 tick, int id, intptr_t data) {
 	online_db->foreach(online_db, online_data_cleanup_sub);
 	return 0;
-} 
+}
 
 
 //--------------------------------------------------------------------
@@ -284,7 +287,7 @@ int lan_subnetcheck(uint32 ip)
 }
 
 //----------------------------------
-// Reading Lan Support configuration
+// Reading LAN Support configuration
 //----------------------------------
 int login_lan_config_read(const char *lancfgName)
 {
@@ -303,8 +306,7 @@ int login_lan_config_read(const char *lancfgName)
 		if ((line[0] == '/' && line[1] == '/') || line[0] == '\n' || line[1] == '\n')
 			continue;
 
-		if(sscanf(line,"%[^:]: %[^:]:%[^:]:%[^\r\n]", w1, w2, w3, w4) != 4)
-		{
+		if (sscanf(line, "%63[^:]: %63[^:]:%63[^:]:%63[^\r\n]", w1, w2, w3, w4) != 4) {
 			ShowWarning("Error syntax of configuration file %s in line %d.\n", lancfgName, line_num);
 			continue;
 		}
@@ -615,10 +617,9 @@ int parse_fromchar(int fd)
 			int sec = (short)RFIFOW(fd,16);
 			RFIFOSKIP(fd,18);
 
-			if( !accounts->load_num(accounts, &acc, account_id) )
+			if (!accounts->load_num(accounts, &acc, account_id)) {
 				ShowNotice("Char-server '%s': Error of ban request (account: %d not found, ip: %s).\n", server[id].name, account_id, ip);
-			else
-			{
+			} else {
 				time_t timestamp;
 				struct tm *tmtime;
 				if (acc.unban_time == 0 || acc.unban_time < time(NULL))
@@ -626,24 +627,23 @@ int parse_fromchar(int fd)
 				else
 					timestamp = acc.unban_time; // add to existing ban
 				tmtime = localtime(&timestamp);
-				tmtime->tm_year = tmtime->tm_year + year;
-				tmtime->tm_mon  = tmtime->tm_mon + month;
-				tmtime->tm_mday = tmtime->tm_mday + mday;
-				tmtime->tm_hour = tmtime->tm_hour + hour;
-				tmtime->tm_min  = tmtime->tm_min + min;
-				tmtime->tm_sec  = tmtime->tm_sec + sec;
+				tmtime->tm_year += year;
+				tmtime->tm_mon  += month;
+				tmtime->tm_mday += mday;
+				tmtime->tm_hour += hour;
+				tmtime->tm_min  += min;
+				tmtime->tm_sec  += sec;
 				timestamp = mktime(tmtime);
-				if (timestamp == -1)
+				if (timestamp == -1) {
 					ShowNotice("Char-server '%s': Error of ban request (account: %d, invalid date, ip: %s).\n", server[id].name, account_id, ip);
-				else
-				if( timestamp <= time(NULL) || timestamp == 0 )
+				} else if( timestamp <= time(NULL) || timestamp == 0 ) {
 					ShowNotice("Char-server '%s': Error of ban request (account: %d, new date unbans the account, ip: %s).\n", server[id].name, account_id, ip);
-				else
-				{
+				} else {
 					uint8 buf[11];
 					char tmpstr[24];
 					timestamp2string(tmpstr, sizeof(tmpstr), timestamp, login_config.date_format);
-					ShowNotice("Char-server '%s': Ban request (account: %d, new final date of banishment: %d (%s), ip: %s).\n", server[id].name, account_id, timestamp, tmpstr, ip);
+					ShowNotice("Char-server '%s': Ban request (account: %d, new final date of banishment: %ld (%s), ip: %s).\n",
+					           server[id].name, account_id, (long)timestamp, tmpstr, ip);
 
 					acc.unban_time = timestamp;
 
@@ -721,13 +721,13 @@ int parse_fromchar(int fd)
 			RFIFOSKIP(fd,6);
 
 			if( !accounts->load_num(accounts, &acc, account_id) )
-				ShowNotice("Char-server '%s': Error of UnBan request (account: %d not found, ip: %s).\n", server[id].name, account_id, ip);
+				ShowNotice("Char-server '%s': Error of Unban request (account: %d not found, ip: %s).\n", server[id].name, account_id, ip);
 			else
 			if( acc.unban_time == 0 )
-				ShowNotice("Char-server '%s': Error of UnBan request (account: %d, no change for unban date, ip: %s).\n", server[id].name, account_id, ip);
+				ShowNotice("Char-server '%s': Error of Unban request (account: %d, no change for unban date, ip: %s).\n", server[id].name, account_id, ip);
 			else
 			{
-				ShowNotice("Char-server '%s': UnBan request (account: %d, ip: %s).\n", server[id].name, account_id, ip);
+				ShowNotice("Char-server '%s': Unban request (account: %d, ip: %s).\n", server[id].name, account_id, ip);
 				acc.unban_time = 0;
 				accounts->save(accounts, &acc);
 			}
@@ -842,18 +842,20 @@ int parse_fromchar(int fd)
 					WFIFOHEAD(fd,183);
 					WFIFOW(fd,0) = 0x2737;
 					safestrncpy((char*)WFIFOP(fd,2), acc.userid, NAME_LENGTH);
-					if (u_group >= acc.group_id) {
+					if (u_group >= acc.group_id)
 						safestrncpy((char*)WFIFOP(fd,26), acc.pass, 33);
-					}
+					else
+						memset(WFIFOP(fd,26), '\0', 33);
 					safestrncpy((char*)WFIFOP(fd,59), acc.email, 40);
 					safestrncpy((char*)WFIFOP(fd,99), acc.last_ip, 16);
 					WFIFOL(fd,115) = acc.group_id;
 					safestrncpy((char*)WFIFOP(fd,119), acc.lastlogin, 24);
 					WFIFOL(fd,143) = acc.logincount;
 					WFIFOL(fd,147) = acc.state;
-					if (u_group >= acc.group_id) {
+					if (u_group >= acc.group_id) 
 						safestrncpy((char*)WFIFOP(fd,151), acc.pincode, 5);
-					}
+					else
+						memset(WFIFOP(fd,151), '\0', 5);
 					safestrncpy((char*)WFIFOP(fd,156), acc.birthdate, 11);
 					WFIFOL(fd,167) = map_fd;
 					WFIFOL(fd,171) = u_fd;
@@ -909,7 +911,7 @@ int mmo_auth_new(const char* userid, const char* pass, const char sex, const cha
 
 	// check if the account doesn't exist already
 	if( accounts->load_str(accounts, &acc, userid) ) {
-		ShowNotice("Attempt of creation of an already existant account (account: %s_%c, pass: %s, received pass: %s)\n", userid, sex, acc.pass, pass);
+		ShowNotice("Attempt of creation of an already existing account (account: %s_%c, pass: %s, received pass: %s)\n", userid, sex, acc.pass, pass);
 		return 1; // 1 = Incorrect Password
 	}
 
@@ -1036,14 +1038,15 @@ int mmo_auth(struct login_session_data* sd, bool isServer) {
 			int i;
 
 			if( !sd->has_client_hash ) {
-				ShowNotice("Client didn't send client hash (account: %s, pass: %s, ip: %s)\n", sd->userid, sd->passwd, acc.state, ip);
+				ShowNotice("Client didn't send client hash (account: %s, pass: %s, ip: %s)\n", sd->userid, sd->passwd, ip);
 				return 5;
 			}
 
 			for( i = 0; i < 16; i++ )
 				sprintf(&smd5[i * 2], "%02x", sd->client_hash[i]);
+			smd5[32] = '\0';
 
-			ShowNotice("Invalid client hash (account: %s, pass: %s, sent md5: %d, ip: %s)\n", sd->userid, sd->passwd, smd5, ip);
+			ShowNotice("Invalid client hash (account: %s, pass: %s, sent md5: %s, ip: %s)\n", sd->userid, sd->passwd, smd5, ip);
 			return 5;
 		}
 	}
@@ -1101,12 +1104,12 @@ void login_auth_ok(struct login_session_data* sd)
 		WFIFOSET(fd,3);
 		return;
 	} else if( login_config.min_group_id_to_connect >= 0 && login_config.group_id_to_connect == -1 && sd->group_id < login_config.min_group_id_to_connect ) {
-		ShowStatus("Connection refused: the minium group id required for connection is %d (account: %s, group: %d).\n", login_config.min_group_id_to_connect, sd->userid, sd->group_id);
+		ShowStatus("Connection refused: the minimum group id required for connection is %d (account: %s, group: %d).\n", login_config.min_group_id_to_connect, sd->userid, sd->group_id);
 		WFIFOHEAD(fd,3);
 		WFIFOW(fd,0) = 0x81;
 		WFIFOB(fd,2) = 1; // 01 = Server closed
 		WFIFOSET(fd,3);
-		return;		
+		return;
 	}
 
 	server_num = 0;
@@ -1306,7 +1309,7 @@ int parse_login(int fd)
 		// Perform ip-ban check
 		if( login_config.ipban && ipban_check(ipl) )
 		{
-			ShowStatus("Connection refused: IP isn't authorised (deny/allow, ip: %s).\n", ip);
+			ShowStatus("Connection refused: IP isn't authorized (deny/allow, ip: %s).\n", ip);
 			login_log(ipl, "unknown", -3, "ip banned");
 			WFIFOHEAD(fd,23);
 			WFIFOW(fd,0) = 0x6a;
@@ -1583,7 +1586,7 @@ int login_config_read(const char* cfgName)
 		if (line[0] == '/' && line[1] == '/')
 			continue;
 
-		if (sscanf(line, "%[^:]: %[^\r\n]", w1, w2) < 2)
+		if (sscanf(line, "%1023[^:]: %1023[^\r\n]", w1, w2) < 2)
 			continue;
 
 		if(!strcmpi(w1,"timestamp_format"))
@@ -1689,8 +1692,7 @@ int login_config_read(const char* cfgName)
 //--------------------------------------
 // Function called at exit of the server
 //--------------------------------------
-void do_final(void)
-{
+int do_final(void) {
 	int i;
 	struct client_hash_node *hn = login_config.client_hash_nodes;
 
@@ -1730,6 +1732,7 @@ void do_final(void)
 	}
 
 	ShowStatus("Finished.\n");
+	return EXIT_SUCCESS;
 }
 
 //------------------------------
@@ -1769,7 +1772,7 @@ int do_init(int argc, char** argv)
 {
 	int i;
 
-	// intialize engine (to accept config settings)
+	// initialize engine (to accept config settings)
 	account_engine[0].db = account_engine[0].constructor();
 
 	// read login-server configuration
@@ -1824,7 +1827,7 @@ int do_init(int argc, char** argv)
 	HPM->config_read(NULL, 0);
 	HPM->event(HPET_INIT);
 	
-	// server port open & binding	
+	// server port open & binding
 	if( (login_fd = make_listen_bind(login_config.login_ip,login_config.login_port)) == -1 ) {
 		ShowFatalError("Failed to bind to port '"CL_WHITE"%d"CL_RESET"'\n",login_config.login_port);
 		exit(EXIT_FAILURE);

@@ -1,5 +1,5 @@
-#ifndef _COMMON_CBASETYPES_H_
-#define _COMMON_CBASETYPES_H_
+#ifndef COMMON_CBASETYPES_H
+#define COMMON_CBASETYPES_H
 
 /*              +--------+-----------+--------+---------+
  *              | ILP32  |   LP64    |  ILP64 | (LL)P64 |
@@ -94,12 +94,6 @@
 // portable printf/scanf format macros and integer definitions
 // NOTE: Visual C++ uses <inttypes.h> and <stdint.h> provided in /3rdparty
 //////////////////////////////////////////////////////////////////////////
-#ifdef __cplusplus
-#define __STDC_CONSTANT_MACROS
-#define __STDC_FORMAT_MACROS
-#define __STDC_LIMIT_MACROS
-#endif
-
 #include <inttypes.h>
 #include <stdint.h>
 #include <limits.h>
@@ -280,11 +274,6 @@ typedef uintptr_t uintptr;
 #endif
 
 
-/////////////////////////////
-// for those still not building c++
-#ifndef __cplusplus
-//////////////////////////////
-
 // boolean types for C
 #if !defined(_MSC_VER) || _MSC_VER >= 1800
 // MSVC doesn't have stdbool.h yet as of Visual Studio 2012 (MSVC version 17.00)
@@ -302,10 +291,6 @@ typedef char bool;
 #define __bool_true_false_are_defined
 #endif // __bool_true_false_are_defined
 
-//////////////////////////////
-#endif // not __cplusplus
-//////////////////////////////
-
 //////////////////////////////////////////////////////////////////////////
 // macro tools
 
@@ -313,7 +298,7 @@ typedef char bool;
 #undef swap
 #endif
 // hmm only ints?
-//#define swap(a,b) { int temp=a; a=b; b=temp;} 
+//#define swap(a,b) { int temp=a; a=b; b=temp;}
 // if using macros then something that is type independent
 //#define swap(a,b) ((a == b) || ((a ^= b), (b ^= a), (a ^= b)))
 // Avoid "value computed is not used" warning and generates the same assembly code
@@ -360,6 +345,19 @@ typedef char bool;
 #ifndef NBBY
 #define	NBBY 8
 #endif
+
+//////////////////////////////////////////////////////////////////////////
+// Additional printf specifiers
+#if defined(_MSC_VER)
+#define PRIS_PREFIX "I"
+#else // gcc
+#define PRIS_PREFIX "z"
+#endif
+#define PRIdS PRIS_PREFIX "d"
+#define PRIxS PRIS_PREFIX "x"
+#define PRIuS PRIS_PREFIX "u"
+#define PRIXS PRIS_PREFIX "X"
+#define PRIoS PRIS_PREFIX "o"
 
 //////////////////////////////////////////////////////////////////////////
 // path separator
@@ -421,26 +419,11 @@ typedef char bool;
 #define EXPAND_AND_QUOTE(x) QUOTE(x)
 
 
-//////////////////////////////////////////////////////////////////////////
-// Set a pointer variable to a pointer value.
-#ifdef __cplusplus
-template <typename T1, typename T2>
-void SET_POINTER(T1*&var, T2* p)
-{
-	var = static_cast<T1*>(p);
-}
-template <typename T1, typename T2>
-void SET_FUNCPOINTER(T1& var, T2 p)
-{
-	char ASSERT_POINTERSIZE[sizeof(T1) == sizeof(void*) && sizeof(T2) == sizeof(void*)?1:-1];// 1 if true, -1 if false
-	union{ T1 out; T2 in; } tmp;// /!\ WARNING casting a pointer to a function pointer is against the C++ standard
-	tmp.in = p;
-	var = tmp.out;
-}
+/* pointer size fix which fixes several gcc warnings */
+#ifdef __64BIT__
+	#define h64BPTRSIZE(y) ((intptr)(y))
 #else
-#define SET_POINTER(var,p) ((var) = (p))
-#define SET_FUNCPOINTER(var,p) ((var) = (p))
+	#define h64BPTRSIZE(y) (y)
 #endif
 
-
-#endif /* _COMMON_CBASETYPES_H_ */
+#endif /* COMMON_CBASETYPES_H */

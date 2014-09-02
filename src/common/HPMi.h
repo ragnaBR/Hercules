@@ -1,12 +1,12 @@
 // Copyright (c) Hercules Dev Team, licensed under GNU GPL.
 // See the LICENSE file
 
-#ifndef _COMMON_HPMI_H_
-#define _COMMON_HPMI_H_
+#ifndef COMMON_HPMI_H
+#define COMMON_HPMI_H
 
 #include "../common/cbasetypes.h"
-#include "../common/core.h"
 #include "../common/console.h"
+#include "../common/core.h"
 #include "../common/sql.h"
 
 struct script_state;
@@ -18,18 +18,6 @@ struct map_session_data;
 	#define HPExport __declspec(dllexport)
 #else
 	#define HPExport
-#endif
-
-#ifndef _COMMON_SHOWMSG_H_
-	HPExport void (*ShowMessage) (const char *, ...);
-	HPExport void (*ShowStatus) (const char *, ...);
-	HPExport void (*ShowSQL) (const char *, ...);
-	HPExport void (*ShowInfo) (const char *, ...);
-	HPExport void (*ShowNotice) (const char *, ...);
-	HPExport void (*ShowWarning) (const char *, ...);
-	HPExport void (*ShowDebug) (const char *, ...);
-	HPExport void (*ShowError) (const char *, ...);
-	HPExport void (*ShowFatalError) (const char *, ...);
 #endif
 
 /* after */
@@ -192,8 +180,8 @@ HPExport struct HPMi_interface {
 	/* pc group permission */
 	void (*addPCGPermission) (unsigned int pluginID, char *name, unsigned int *mask);
 } HPMi_s;
-#ifndef _COMMON_HPM_H_
+#ifndef HERCULES_CORE
 HPExport struct HPMi_interface *HPMi;
 #endif
 
-#endif /* _COMMON_HPMI_H_ */
+#endif /* COMMON_HPMI_H */

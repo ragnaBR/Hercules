@@ -2,15 +2,18 @@
 // See the LICENSE file
 // Portions Copyright (c) Athena Dev Teams
 
-#include "../common/malloc.h"
-#include "../common/core.h"
-#include "../common/showmsg.h"
-#include "../common/sysinfo.h"
+#define HERCULES_CORE
+
+#include "malloc.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#include "../common/core.h"
+#include "../common/showmsg.h"
+#include "../common/sysinfo.h"
 
 struct malloc_interface iMalloc_s;
 
@@ -18,7 +21,7 @@ struct malloc_interface iMalloc_s;
 
 #if defined(MEMWATCH)
 
-#	include <string.h> 
+#	include <string.h>
 #	include "memwatch.h"
 #	define MALLOC(n,file,line,func)    mwMalloc((n),(file),(line))
 #	define CALLOC(m,n,file,line,func)  mwCalloc((m),(n),(file),(line))
@@ -232,14 +235,13 @@ static size_t hash2size( unsigned short hash )
 	}
 }
 
-void* _mmalloc(size_t size, const char *file, int line, const char *func )
-{
+void *mmalloc_(size_t size, const char *file, int line, const char *func) {
 	struct block *block;
 	short size_hash = size2hash( size );
 	struct unit_head *head;
 
 	if (((long) size) < 0) {
-		ShowError("_mmalloc: %d\n", size);
+		ShowError("mmalloc_: %"PRIdS"\n", size);
 		return NULL;
 	}
 
@@ -270,7 +272,8 @@ void* _mmalloc(size_t size, const char *file, int line, const char *func )
 			*(long*)((char*)p + sizeof(struct unit_head_large) - sizeof(long) + size) = 0xdeadbeaf;
 			return (char *)p + sizeof(struct unit_head_large) - sizeof(long);
 		} else {
-			ShowFatalError("Memory manager::memmgr_alloc failed (allocating %d+%d bytes at %s:%d).\n", sizeof(struct unit_head_large), size, file, line);
+			ShowFatalError("Memory manager::memmgr_alloc failed (allocating %"PRIuS"+%"PRIuS" bytes at %s:%d).\n",
+			               sizeof(struct unit_head_large), size, file, line);
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -338,15 +341,13 @@ void* _mmalloc(size_t size, const char *file, int line, const char *func )
 	return (char *)head + sizeof(struct unit_head) - sizeof(long);
 }
 
-void* _mcalloc(size_t num, size_t size, const char *file, int line, const char *func )
-{
+void *mcalloc_(size_t num, size_t size, const char *file, int line, const char *func) {
 	void *p = iMalloc->malloc(num * size,file,line,func);
 	memset(p,0,num * size);
 	return p;
 }
 
-void* _mrealloc(void *memblock, size_t size, const char *file, int line, const char *func )
-{
+void *mrealloc_(void *memblock, size_t size, const char *file, int line, const char *func) {
 	size_t old_size;
 	if(memblock == NULL) {
 		return iMalloc->malloc(size,file,line,func);
@@ -370,8 +371,8 @@ void* _mrealloc(void *memblock, size_t size, const char *file, int line, const c
 	}
 }
 
-/* a _mrealloc clone with the difference it 'z'eroes the newly created memory */
-void* _mreallocz(void *memblock, size_t size, const char *file, int line, const char *func ) {
+/* a mrealloc_ clone with the difference it 'z'eroes the newly created memory */
+void *mreallocz_(void *memblock, size_t size, const char *file, int line, const char *func) {
 	size_t old_size;
 	void *p = NULL;
 	
@@ -401,8 +402,7 @@ void* _mreallocz(void *memblock, size_t size, const char *file, int line, const 
 }
 
 
-char* _mstrdup(const char *p, const char *file, int line, const char *func )
-{
+char *mstrdup_(const char *p, const char *file, int line, const char *func) {
 	if(p == NULL) {
 		return NULL;
 	} else {
@@ -413,12 +413,11 @@ char* _mstrdup(const char *p, const char *file, int line, const char *func )
 	}
 }
 
-void _mfree(void *ptr, const char *file, int line, const char *func )
-{
+void mfree_(void *ptr, const char *file, int line, const char *func) {
 	struct unit_head *head;
 
 	if (ptr == NULL)
-		return; 
+		return;
 
 	head = (struct unit_head *)((char *)ptr - sizeof(struct unit_head) + sizeof(long));
 	if(head->size == 0) {
@@ -570,8 +569,7 @@ size_t memmgr_usage (void)
 static char memmer_logfile[128];
 static FILE *log_fp;
 
-static void memmgr_log (char *buf)
-{
+static void memmgr_log(char *buf, char *vcsinfo) {
 	if( !log_fp ) {
 		time_t raw;
 		struct tm* t;
@@ -581,8 +579,8 @@ static void memmgr_log (char *buf)
 
 		time(&raw);
 		t = localtime(&raw);
-		fprintf(log_fp, "\nMemory manager: Memory leaks found at %d/%02d/%02d %02dh%02dm%02ds (%s rev '%s').\n",
-			(t->tm_year+1900), (t->tm_mon+1), t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, sysinfo->vcstype(), sysinfo->vcsrevision_src());
+		fprintf(log_fp, "\nMemory manager: Memory leaks found at %d/%02d/%02d %02dh%02dm%02ds (%s).\n",
+			(t->tm_year+1900), (t->tm_mon+1), t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec, vcsinfo);
 	}
 	fprintf(log_fp, "%s", buf);
 	return;
@@ -639,10 +637,12 @@ static void memmgr_final (void)
 {
 	struct block *block = block_first;
 	struct unit_head_large *large = unit_head_large_first;
-
+	char vcsinfo[256];
 #ifdef LOG_MEMMGR
 	int count = 0;
 #endif /* LOG_MEMMGR */
+	snprintf(vcsinfo, sizeof(vcsinfo), "%s rev '%s'", sysinfo->vcstype(), sysinfo->vcsrevision_src()); // Cache VCS info before we free() it
+	sysinfo->final();
 
 	while (block) {
 		if (block->unit_used) {
@@ -656,7 +656,7 @@ static void memmgr_final (void)
 					sprintf (buf,
 						"%04d : %s line %d size %lu address 0x%p\n", ++count,
 						head->file, head->line, (unsigned long)head->size, ptr);
-					memmgr_log (buf);
+					memmgr_log(buf, vcsinfo);
 #endif /* LOG_MEMMGR */
 					// get block pointer and free it [celest]
 					iMalloc->free(ptr, ALC_MARK);
@@ -673,7 +673,7 @@ static void memmgr_final (void)
 		sprintf (buf,
 			"%04d : %s line %d size %lu address 0x%p\n", ++count,
 			large->unit_head.file, large->unit_head.line, (unsigned long)large->size, &large->unit_head.checksum);
-		memmgr_log (buf);
+		memmgr_log(buf, vcsinfo);
 #endif /* LOG_MEMMGR */
 		large2 = large->next;
 		FREE(large,file,line,func);
@@ -761,10 +761,10 @@ void memmgr_report (int extra) {
 	ShowMessage("[malloc] : reporting %u instances | %.2f MB\n",count,(double)((size)/1024)/1024);
 	ShowMessage("[malloc] : internal usage %.2f MB | %.2f MB\n",(double)((memmgr_usage_bytes_t-memmgr_usage_bytes)/1024)/1024,(double)((memmgr_usage_bytes_t)/1024)/1024);
 	
-	if( extra ) {
-		ShowMessage("[malloc] : unit_head_large: %d bytes\n",sizeof(struct unit_head_large));
-		ShowMessage("[malloc] : unit_head: %d bytes\n",sizeof(struct unit_head));
-		ShowMessage("[malloc] : block: %d bytes\n",sizeof(struct block));
+	if (extra) {
+		ShowMessage("[malloc] : unit_head_large: %"PRIuS" bytes\n", sizeof(struct unit_head_large));
+		ShowMessage("[malloc] : unit_head: %"PRIuS" bytes\n", sizeof(struct unit_head));
+		ShowMessage("[malloc] : block: %"PRIuS" bytes\n", sizeof(struct block));
 	}
 
 }
@@ -773,7 +773,7 @@ static void memmgr_init (void)
 {
 #ifdef LOG_MEMMGR
 	sprintf(memmer_logfile, "log/%s.leaks", SERVER_NAME);
-	ShowStatus("Memory manager initialised: "CL_WHITE"%s"CL_RESET"\n", memmer_logfile);
+	ShowStatus("Memory manager initialized: "CL_WHITE"%s"CL_RESET"\n", memmer_logfile);
 	memset(hash_unfill, 0, sizeof(hash_unfill));
 #endif /* LOG_MEMMGR */
 }
@@ -781,7 +781,7 @@ static void memmgr_init (void)
 
 
 /*======================================
-* Initialise
+* Initialize
 *--------------------------------------
 */
 
@@ -848,12 +848,12 @@ void malloc_defaults(void) {
 
 // Athena's built-in Memory Manager
 #ifdef USE_MEMMGR
-	iMalloc->malloc  =	 _mmalloc;
-	iMalloc->calloc  =	 _mcalloc;
-	iMalloc->realloc =	 _mrealloc;
-	iMalloc->reallocz=	 _mreallocz;
-	iMalloc->astrdup =	 _mstrdup;
-	iMalloc->free    =	 _mfree;
+	iMalloc->malloc  =	 mmalloc_;
+	iMalloc->calloc  =	 mcalloc_;
+	iMalloc->realloc =	 mrealloc_;
+	iMalloc->reallocz=	 mreallocz_;
+	iMalloc->astrdup =	 mstrdup_;
+	iMalloc->free    =	 mfree_;
 #else
 	iMalloc->malloc  =	aMalloc_;
 	iMalloc->calloc  =	aCalloc_;

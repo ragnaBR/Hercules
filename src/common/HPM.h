@@ -1,11 +1,15 @@
 // Copyright (c) Hercules Dev Team, licensed under GNU GPL.
 // See the LICENSE file
 
-#ifndef _COMMON_HPM_H_
-#define _COMMON_HPM_H_
+#ifndef COMMON_HPM_H
+#define COMMON_HPM_H
 
-#include "../common/cbasetypes.h"
+#ifndef HERCULES_CORE
+#error You should never include HPM.h from a plugin.
+#endif
+
 #include "../common/HPMi.h"
+#include "../common/cbasetypes.h"
 
 #ifdef WIN32
 	#ifndef WIN32_LEAN_AND_MEAN
@@ -20,7 +24,7 @@
 	#define DLL                   HINSTANCE
 #else // ! WIN32
 	#include <dlfcn.h>
-	#ifdef RTLD_DEEPBIND // Certain linux ditributions require this, but it's not available everywhere
+	#ifdef RTLD_DEEPBIND // Certain linux distributions require this, but it's not available everywhere
 		#define plugin_open(x) dlopen((x),RTLD_NOW|RTLD_DEEPBIND)
 	#else // ! RTLD_DEEPBIND
 		#define plugin_open(x) dlopen((x),RTLD_NOW)
@@ -154,4 +158,4 @@ struct HPM_interface *HPM;
 
 void hpm_defaults(void);
 
-#endif /* _COMMON_HPM_H_ */
+#endif /* COMMON_HPM_H */
